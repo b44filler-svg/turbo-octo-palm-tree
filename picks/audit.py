@@ -26,7 +26,9 @@ BIG = dict(min_prob=0.60, min_edge=0.025, min_ev=0.03, min_odds=-300, max_odds=1
 PAIR = dict(min_leg_prob=0.60, min_joint=0.42, min_dec=1.9, max_dec=3.6, min_ev=0.02)
 PARLAY = dict(min_payout10=18.0, min_ev=0.0, min_odds=-500, max_odds=-150)
 BOARD = dict(min_prob=0.50)
+BOOST_MIN_JOINT = 0.25
 LEGS_BY_KIND = {"big": 1, "pair": 2, "parlay3": 3}
+BOOST_LEGS = (1, 4)   # a boost ticket may have 1 to 4 legs
 REQUIRED = ("sport", "game", "pick", "market", "type", "odds", "modelProb", "source")
 BANNED = re.compile(r"\b(lock(ed)? ?in|guarantee[ds]?|can'?t lose|sure thing|free money)\b", re.I)
 
@@ -72,7 +74,7 @@ class Report:
         return "FAIL" if "FAIL" in lv else "WARN" if "WARN" in lv else "PASS"
 
 
-def check_leg(r, l, where, never_against, now, legacy=False):
+def check_leg(r, l, where, never_against, now, legacy=False, books=None):
     for f in REQUIRED:
         if l.get(f) in (None, ""):
             r.fail("missing-field", f"{where}: missing `{f}`")
@@ -101,9 +103,11 @@ def check_leg(r, l, where, never_against, now, legacy=False):
     prot = rules.loyalty_violation(l, never_against)
     if prot:
         r.fail("loyalty", f"{where}: '{l.get('pick')}' bets against the {prot} (never-against rule)")
-    src = str(l.get("source", ""))
-    if src and ("fanduel" not in src.lower() or re.search(r"not fanduel", src, re.I)):
-        r.warn("not-fanduel", f"{where}: price is not confirmed as FanDuel's ({src[:60]})")
+    book = l.get("book")
+    if book and books and book.lower() not in {b.lower() for b in books}:
+        r.fail("wrong-book", f"{where}: priced at {book}, which isn't one of Bob's books ({', '.join(books)})")
+    elif not book and not legacy:
+        r.warn("no-book", f"{where}: doesn't say which sportsbook the price is from")
     sharp = str(l.get("sharpSource", ""))
     if l.get("fairFlag") or re.search(r"thin|one-sided|fanduel only", sharp, re.I):
         r.warn("thin-fair", f"{where}: fair price is from a thin or one-sided market")
@@ -119,20 +123,34 @@ def check_leg(r, l, where, never_against, now, legacy=False):
             r.warn("bad-start", f"{where}: startISO {st!r} is not ISO time")
 
 
-def check_ticket(tid, t, never_against, now=None):
+def check_ticket(tid, t, never_against, now=None, books=None):
     r = Report(tid)
     legs = t.get("legs") or []
     legacy = "kind" not in t   # tickets from before bet types existed
     kind = t.get("kind") or {1: "big", 2: "pair"}.get(len(legs), "parlay3")
     want = LEGS_BY_KIND.get(kind)
-    if want is None:
+    boost = t.get("boost") if kind == "boost" else None
+    if kind == "boost":
+        if not (BOOST_LEGS[0] <= len(legs) <= BOOST_LEGS[1]):
+            r.fail("leg-count", f"boost tickets need 1-4 legs, has {len(legs)}")
+        if not boost or not isinstance(boost.get("pct"), (int, float)) or not boost.get("book"):
+            r.fail("boost-info", "boost ticket needs `boost` with `book` and `pct`")
+            boost = None
+        elif any(l.get("book") != boost["book"] for l in legs):
+            r.fail("boost-book", f"every leg must be priced at {boost['book']}, the book offering the boost")
+    elif want is None:
         r.fail("bad-kind", f"unknown kind {kind!r}")
     elif len(legs) != want:
         r.fail("leg-count", f"{kind} needs {want} legs, has {len(legs)}")
+    leg_books = {l.get("book") for l in legs if l.get("book")}
+    if len(legs) > 1 and len(leg_books) > 1:
+        r.fail("mixed-books", f"a parlay has to be placed at one book, legs are at {sorted(leg_books)}")
+    if t.get("book") and leg_books and leg_books != {t["book"]}:
+        r.fail("ticket-book", f"ticket says {t['book']} but legs are at {sorted(leg_books)}")
     for i, l in enumerate(legs):
-        check_leg(r, l, f"leg {i + 1}", never_against, now, legacy)
+        check_leg(r, l, f"leg {i + 1}", never_against, now, legacy, books)
     if t.get("backup"):
-        check_leg(r, t["backup"], "backup", never_against, now, legacy)
+        check_leg(r, t["backup"], "backup", never_against, now, legacy, books)
     for i, j, why in rules.ticket_conflicts(legs):
         r.fail("conflict", f"legs {i + 1} and {j + 1}: {why}")
     if t.get("sport") and t.get("sport") != "Mix" and kind == "parlay3":
@@ -146,9 +164,11 @@ def check_ticket(tid, t, never_against, now=None):
     if not legs or None in decs:
         return r
     d = math.prod(decs)
+    if boost:
+        d = 1 + (d - 1) * (1 + boost["pct"])   # profit boost: winnings grow, stake doesn't
     if t.get("payout10") is not None and abs(t["payout10"] - 10 * d) > TOL_PAY:
         r.fail("payout-math", f"payout10 {t['payout10']} but the prices pay {10 * d:.2f}")
-    if t.get("parlayOdds") is not None and len(legs) > 1 and abs(float(t["parlayOdds"]) - american(d)) > 1:
+    if t.get("parlayOdds") is not None and (len(legs) > 1 or boost) and abs(float(t["parlayOdds"]) - american(d)) > 1:
         r.fail("odds-math", f"parlayOdds {sgn(t['parlayOdds'])} but the prices make {american(d):+d}")
     probs = [l.get("modelProb") for l in legs]
     if all(isinstance(p, (int, float)) for p in probs):
@@ -190,6 +210,11 @@ def check_ticket(tid, t, never_against, now=None):
             out = [sgn(l["odds"]) for l in legs if not PARLAY["min_odds"] <= float(l["odds"]) <= PARLAY["max_odds"]]
             if out:
                 r.fail("parlay-odds", f"3-leg parlay legs must be -500 to -150: {out}")
+        if kind == "boost":
+            if e <= 0:
+                r.fail("boost-value", f"even with the boost, model value is {e:+.1%}")
+            if win < BOOST_MIN_JOINT - EPS:
+                r.fail("boost-longshot", f"win chance {win:.0%} is under {BOOST_MIN_JOINT:.0%}")
     return r
 
 
@@ -203,18 +228,20 @@ def tickets_from(obj):
             out[f"pair-{i}"] = p
         for s, p in (obj.get("parlays") or {}).items():
             out[s.lower()] = p
+        for i, p in enumerate(obj.get("boosts") or [], 1):
+            out[f"boost-{i}"] = p
         return out, obj.get("board") or []
     if isinstance(obj, list):
         return {d.get("_id") or d.get("id") or f"#{i}": d.get("data", d) for i, d in enumerate(obj)}, []
     return {k: v.get("data", v) if isinstance(v, dict) else v for k, v in obj.items()}, []
 
 
-def audit(obj, never_against, now=None):
+def audit(obj, never_against, now=None, books=None):
     tickets, board = tickets_from(obj)
-    reports = [check_ticket(tid, t, never_against, now) for tid, t in tickets.items()]
+    reports = [check_ticket(tid, t, never_against, now, books) for tid, t in tickets.items()]
     br = Report("board")
     for i, l in enumerate(board):
-        check_leg(br, l, f"board {i + 1}", never_against, now)
+        check_leg(br, l, f"board {i + 1}", never_against, now, books=books)
         bd = safe_dec(l.get("odds"))
         if l.get("modelProb") is not None and bd:
             if l["modelProb"] * bd - 1 <= 0:
@@ -248,7 +275,7 @@ def main(argv=None):
         print("[FAIL] settings: no `neverAgainst` list, so the loyalty rule can't be checked (pass --settings)")
         return 1
     now = datetime.fromisoformat(a.now.replace("Z", "+00:00")) if a.now else datetime.now(timezone.utc)
-    reports = audit(json.load(open(a.tickets)), settings.get("neverAgainst", []), now)
+    reports = audit(json.load(open(a.tickets)), settings.get("neverAgainst", []), now, settings.get("books"))
     if a.json:
         print(json.dumps([{"ticket": r.tid, "status": r.status, "findings": r.items} for r in reports], indent=2))
     else:

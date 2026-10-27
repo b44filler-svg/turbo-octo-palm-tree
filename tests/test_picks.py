@@ -302,6 +302,7 @@ def test_audit_thresholds_match_builder():
     assert {k: build.PAIR[k] for k in audit.PAIR} == audit.PAIR
     assert {k: build.PARLAY[k] for k in audit.PARLAY} == audit.PARLAY
     assert audit.BOARD["min_prob"] == build.BOARD["min_prob"]
+    assert audit.BOOST_MIN_JOINT == build.BOOST["min_joint"]
 
 
 def test_audit_survives_garbage(built):
@@ -351,3 +352,82 @@ def test_legacy_ticket_without_kind():
 def test_selftest_passes():
     from picks import selftest
     assert selftest.main() == 0
+
+
+# ---------- multiple sportsbooks and promos ----------
+
+BOOKS = {"neverAgainst": EAGLES, "books": ["FanDuel", "Courtside", "DraftKings"]}
+
+
+def multibook():
+    """The fixture candidates, each priced at three books (FanDuel's price kept as given)."""
+    out = []
+    for i, c in enumerate(load("candidates.json")):
+        c = dict(c)
+        fd = c.pop("odds")
+        c.pop("source")
+        bump = 10 if i % 3 == 0 else -5   # some legs better elsewhere, some worse
+        alt = fd + bump if not (-100 < fd + bump < 100) else fd
+        c["prices"] = {"FanDuel": fd, "Courtside": alt, "BetMGM": fd + 20 if fd + 20 >= 100 or fd + 20 <= -100 else fd}
+        out.append(c)
+    return out
+
+
+def test_singles_take_the_best_price_at_bobs_books():
+    res = build.build_all(multibook(), "2026-10-27", BOOKS)
+    for l in res["board"]:
+        assert l["book"] in ("FanDuel", "Courtside")       # BetMGM isn't one of Bob's books
+        others = l.get("otherPrices", {})
+        assert all(om.am_to_dec(l["odds"]) >= om.am_to_dec(o) for o in others.values())
+
+
+def test_parlays_stay_at_one_book():
+    res = build.build_all(multibook(), "2026-10-27", BOOKS)
+    for t in res["pairs"] + list(res["parlays"].values()):
+        assert len({l["book"] for l in t["legs"]}) == 1 and t["book"] == t["legs"][0]["book"]
+    assert [r.tid for r in audit.audit(res, EAGLES, NOW, BOOKS["books"]) if r.status == "FAIL"] == []
+
+
+def test_legs_not_at_bobs_books_are_dropped():
+    c = dict(load("candidates.json")[3]); c.pop("odds"); c.pop("source")
+    c["prices"] = {"BetMGM": -300}
+    res = build.build_all([c], "2026-10-27", {"neverAgainst": EAGLES, "books": ["FanDuel"]})
+    assert "not offered at your books" in res["dropped"][0]["why"]
+
+
+def test_audit_catches_mixed_books_and_wrong_book():
+    res = build.build_all(multibook(), "2026-10-27", BOOKS)
+    bad = copy.deepcopy(res)
+    p = bad["pairs"][0]
+    p["legs"][1]["book"] = "Courtside" if p["legs"][0]["book"] == "FanDuel" else "FanDuel"
+    bad["board"][0]["book"] = "BetMGM"
+    assert {"mixed-books", "wrong-book"} <= codes(audit.audit(bad, EAGLES, NOW, BOOKS["books"]))
+
+
+BOOST = {"id": "fd-nba-30", "book": "FanDuel", "title": "30% profit boost, NBA parlay",
+         "pct": 0.30, "minLegs": 2, "maxLegs": 3, "sport": "NBA", "maxStake": 25}
+
+
+def test_boost_math_and_rules():
+    res = build.build_all(multibook(), "2026-10-27", BOOKS, None, [BOOST])
+    assert len(res["boosts"]) == 1
+    t = res["boosts"][0]
+    assert t["kind"] == "boost" and t["book"] == "FanDuel" and 2 <= len(t["legs"]) <= 3
+    assert all(l["book"] == "FanDuel" and l["sport"] == "NBA" for l in t["legs"])
+    base = math.prod(om.am_to_dec(l["odds"]) for l in t["legs"])
+    assert t["payout10"] == pytest.approx(10 * (1 + (base - 1) * 1.3), abs=0.006)
+    assert t["baseOdds"] == om.dec_to_am(base) and t["ev"] > 0
+    assert [r.tid for r in audit.audit(res, EAGLES, NOW, BOOKS["books"]) if r.status == "FAIL"] == []
+
+
+def test_audit_catches_unboosted_payout_on_boost():
+    res = build.build_all(multibook(), "2026-10-27", BOOKS, None, [BOOST])
+    bad = copy.deepcopy(res)
+    t = bad["boosts"][0]
+    t["boost"]["pct"] = 0.5          # claims a bigger boost than the payout reflects
+    assert "payout-math" in codes(audit.audit(bad, EAGLES, NOW, BOOKS["books"]))
+
+
+def test_boost_at_a_book_with_no_legs_gives_nothing():
+    res = build.build_all(multibook(), "2026-10-27", BOOKS, None, [{**BOOST, "book": "Caesars"}])
+    assert res["boosts"] == []

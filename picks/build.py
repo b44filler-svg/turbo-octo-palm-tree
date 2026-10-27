@@ -11,6 +11,13 @@ Bet types it produces:
   pair     Power Pairs: 2-leg parlays of legs that are too juiced to bet alone
            but pay about even money or better together
   parlay3  the classic 3-leg parlay per sport, closest to a lock
+  boost    the best use of each sportsbook promo (profit boosts), with the
+           boosted payout
+
+Prices: a candidate can carry `prices` = {"FanDuel": -130, "DraftKings": -120, ...}.
+Only books in settings `books` are used (empty = any book). Singles take the best
+price; a parlay must be placed at one book, so each multi-leg ticket is built per
+book and the book that pays most wins.
 """
 import argparse
 import itertools
@@ -30,6 +37,7 @@ PAIR = dict(min_leg_prob=0.60, min_leg_edge=0.0, min_joint=0.42,
 PARLAY = dict(min_payout10=18.0, min_ev=0.0, min_leg_edge=0.0, soft_leg_edge=-0.01,
               min_odds=-500, max_odds=-150)
 BOARD = dict(min_prob=0.50, min_ev=0.0, count=10, sweet_prob=0.55, sweet_dec=1.8)
+BOOST = dict(min_joint=0.25, max_legs=4, min_leg_edge=-0.01, pool=25)
 
 
 def joint(legs):
@@ -41,9 +49,16 @@ def combo_ok(legs):
     return not rules.ticket_conflicts(legs)
 
 
-def ticket(kind, legs, date, sport=None, **extra):
-    dec = om.parlay_dec([l["odds"] for l in legs])
+def boosted_dec(dec, pct):
+    """A profit boost multiplies the winnings, not the stake."""
+    return 1 + (dec - 1) * (1 + pct)
+
+
+def ticket(kind, legs, date, sport=None, boost=None, **extra):
+    base = om.parlay_dec([l["odds"] for l in legs])
+    dec = boosted_dec(base, boost["pct"]) if boost else base
     win = joint(legs)
+    books = {l.get("book") for l in legs}
     doc = {
         "kind": kind,
         "date": date,
@@ -57,15 +72,22 @@ def ticket(kind, legs, date, sport=None, **extra):
         "result": "open",
         "placed": False,
     }
+    if len(books) == 1 and None not in books:
+        doc["book"] = books.pop()
+    if boost:
+        doc["boost"] = boost
+        doc["baseOdds"] = om.dec_to_am(base)
     doc.update(extra)
     return doc
 
 
 def problem(c):
     """Why a candidate can't be used, or None. Bad legs are dropped, not fatal."""
-    for f in ("sport", "game", "pick", "market", "type", "odds", "source"):
+    for f in ("sport", "game", "pick", "market", "type"):
         if c.get(f) in (None, ""):
             return f"missing `{f}`"
+    if not c.get("prices") and (c.get("odds") in (None, "") or not c.get("source")):
+        return "needs `prices` by book (or `odds` plus `source`)"
     t = str(c["type"]).lower()
     if t not in rules.TYPES:
         return f"unknown type {c['type']!r}"
@@ -75,33 +97,68 @@ def problem(c):
         return "prop without `player`"
     if not rules.game_teams(c["game"]):
         return f"game {c['game']!r} isn't 'Away @ Home'"
-    try:
-        om.am_to_dec(c["odds"])
-    except (TypeError, ValueError):
-        return f"bad odds {c['odds']!r}"
+    for book, o in (c.get("prices") or {"": c.get("odds")}).items():
+        try:
+            om.am_to_dec(o)
+        except (TypeError, ValueError):
+            return f"bad odds {o!r}" + (f" at {book}" if book else "")
     return None
 
 
-def prepare(candidates, shrink, never_against):
-    """Score every usable candidate; return (legs, dropped)."""
-    ok, dropped = [], []
+def book_of_source(source):
+    s = str(source or "").lower()
+    if "not fanduel" in s:
+        return "Other"
+    return "FanDuel" if "fanduel" in s else "Other"
+
+
+def price_options(c, books):
+    """{book: odds} this candidate can be bet at, limited to Bob's books."""
+    if c.get("prices"):
+        opts = dict(c["prices"])
+    else:
+        opts = {c.get("book") or book_of_source(c.get("source")): c["odds"]}
+    if books:
+        allowed = {b.lower(): b for b in books}
+        opts = {allowed[b.lower()]: o for b, o in opts.items() if b.lower() in allowed}
+    return {b: int(o) for b, o in opts.items()}
+
+
+def prepare(candidates, shrink, never_against, books=()):
+    """Score every usable candidate at every allowed book.
+
+    Returns (best, by_book, dropped): `best` holds each leg at its best price,
+    `by_book` maps each book to the legs priced there.
+    """
+    best, by_book, dropped = [], {}, []
     for c in candidates:
         why = problem(c)
+        opts = {} if why else price_options(c, books)
+        if not why and not opts:
+            why = "not offered at your books (" + ", ".join(books) + ")"
+        scored = {}
         if not why:
             try:
-                l = score(c, shrink)
+                for book, o in opts.items():
+                    scored[book] = score({**c, "odds": o, "book": book,
+                                          "source": c.get("source") or book}, shrink)
             except (TypeError, ValueError, KeyError) as e:
                 why = f"can't score: {e}"
-        if not why and l["fairProb"] is None:
+        top = max(scored.values(), key=lambda l: om.am_to_dec(l["odds"])) if scored else None
+        if not why and top["fairProb"] is None:
             why = "no market price to anchor the model (stats only)"
         if not why:
-            prot = rules.loyalty_violation(l, never_against)
+            prot = rules.loyalty_violation(top, never_against)
             why = f"bets against {prot}" if prot else None
         if why:
             dropped.append((c, why))
-        else:
-            ok.append(l)
-    return ok, dropped
+            continue
+        if len(scored) > 1:
+            top["otherPrices"] = {b: l["odds"] for b, l in scored.items() if b != top["book"]}
+        best.append(top)
+        for book, l in scored.items():
+            by_book.setdefault(book, []).append(l)
+    return best, by_book, dropped
 
 
 def build_board(legs):
@@ -128,18 +185,19 @@ def build_big(legs, date):
     return ticket("big", [best], date, kellyFull=round(om.kelly(best["modelProb"], dec), 4))
 
 
-def build_pairs(legs, date, exclude=()):
-    pool = [l for l in legs if l["modelProb"] >= PAIR["min_leg_prob"]
-            and l["edge"] >= PAIR["min_leg_edge"] and l.get("pick") not in exclude]
+def build_pairs(by_book, date, exclude=()):
     found = []
-    for a, b in itertools.combinations(pool, 2):
-        if not combo_ok([a, b]):
-            continue
-        t = ticket("pair", [a, b], date)
-        dec = t["payout10"] / 10
-        if (t["winChance"] >= PAIR["min_joint"] and PAIR["min_dec"] <= dec <= PAIR["max_dec"]
-                and t["ev"] >= PAIR["min_ev"]):
-            found.append(t)
+    for legs in by_book.values():
+        pool = [l for l in legs if l["modelProb"] >= PAIR["min_leg_prob"]
+                and l["edge"] >= PAIR["min_leg_edge"] and l.get("pick") not in exclude]
+        for a, b in itertools.combinations(pool, 2):
+            if not combo_ok([a, b]):
+                continue
+            t = ticket("pair", [a, b], date)
+            dec = t["payout10"] / 10
+            if (t["winChance"] >= PAIR["min_joint"] and PAIR["min_dec"] <= dec <= PAIR["max_dec"]
+                    and t["ev"] >= PAIR["min_ev"]):
+                found.append(t)
     found.sort(key=lambda t: (t["growth"], diff_games(t)), reverse=True)
     out, used = [], set()
     for t in found:
@@ -194,7 +252,43 @@ def build_parlay(legs, date, sport):
     return best, found[:5]
 
 
-def build_all(candidates, date, settings=None, stats=None):
+def build_boosts(by_book, boosts, date):
+    """Best ticket for each promo: the combo with the most growth at the boosted price.
+
+    A boost is {"id","book","title","pct":0.30,"minLegs":3,"maxLegs":4,
+    "minLegOdds":-250,"minTotalOdds":200,"sport":"NBA","maxStake":25}; missing
+    limits are open. Only legs at the boost's book can be used.
+    """
+    out = []
+    for b in boosts:
+        pct = float(b.get("pct") or 0)
+        legs = by_book.get(b.get("book"), [])
+        pool = [l for l in legs if l["edge"] >= BOOST["min_leg_edge"]
+                and (not b.get("sport") or str(l["sport"]).upper() == str(b["sport"]).upper())
+                and l["odds"] >= b.get("minLegOdds", -10000)]
+        pool = sorted(pool, key=lambda l: l["modelProb"], reverse=True)[:BOOST["pool"]]
+        lo, hi = int(b.get("minLegs", 1)), min(int(b.get("maxLegs", 3)), BOOST["max_legs"])
+        best = None
+        for n in range(max(1, lo), hi + 1):
+            for combo in itertools.combinations(pool, n):
+                if not combo_ok(list(combo)):
+                    continue
+                if b.get("minTotalOdds") is not None and \
+                        om.dec_to_am(om.parlay_dec([l["odds"] for l in combo])) < b["minTotalOdds"]:
+                    continue
+                info = {k: b[k] for k in ("id", "book", "title", "maxStake", "expires") if k in b}
+                info["pct"] = pct
+                t = ticket("boost", list(combo), date, boost=info)
+                if t["winChance"] < BOOST["min_joint"] or t["ev"] <= 0:
+                    continue
+                if best is None or t["growth"] > best["growth"]:
+                    best = t
+        if best:
+            out.append(best)
+    return out
+
+
+def build_all(candidates, date, settings=None, stats=None, boosts_in=None):
     settings = settings or {}
     settings = settings.get("data", settings)   # accept a raw db export too
     if not isinstance(settings.get("neverAgainst"), list):
@@ -202,20 +296,27 @@ def build_all(candidates, date, settings=None, stats=None):
         raise ValueError("settings need a `neverAgainst` list (use [] for none)")
     stats = (stats or {}).get("data", stats)
     shrink = float((stats or {}).get("shrink", 0.5))
-    legs, dropped = prepare(candidates, shrink, settings["neverAgainst"])
+    books = settings.get("books") or []
+    legs, by_book, dropped = prepare(candidates, shrink, settings["neverAgainst"], books)
     board = build_board(legs)
     big = build_big(legs, date)
-    pairs = build_pairs(legs, date, exclude={big["legs"][0]["pick"]} if big else ())
+    pairs = build_pairs(by_book, date, exclude={big["legs"][0]["pick"]} if big else ())
     parlays, top5 = {}, {}
     for sport in sorted({str(l["sport"]).upper() for l in legs}):
-        best, alts = build_parlay(legs, date, sport)
-        if best:
+        options = [r for r in (build_parlay(bl, date, sport) for bl in by_book.values()) if r[0]]
+        if options:
+            # Closest to a lock first; between books within 2 points, the bigger payout.
+            top = max(o[0]["winChance"] for o in options)
+            best, alts = max((o for o in options if top - o[0]["winChance"] <= 0.02),
+                             key=lambda o: o[0]["payout10"])
             parlays[sport] = best
             top5[sport] = alts
+    boosts = build_boosts(by_book, boosts_in, date) if boosts_in else []
     return {
-        "date": date, "shrink": shrink, "candidates": len(candidates),
+        "date": date, "shrink": shrink, "candidates": len(candidates), "books": books,
         "dropped": [{"pick": l.get("pick"), "why": why} for l, why in dropped],
         "board": board, "big": big, "pairs": pairs, "parlays": parlays, "top5": top5,
+        "boosts": boosts,
     }
 
 
@@ -225,19 +326,20 @@ def main(argv=None):
     ap.add_argument("--date", required=True)
     ap.add_argument("--settings")
     ap.add_argument("--stats")
+    ap.add_argument("--boosts", help="JSON list of today's promos (profit boosts)")
     ap.add_argument("--out")
     a = ap.parse_args(argv)
     load = lambda p: json.load(open(p)) if p else None
-    res = build_all(load(a.candidates), a.date, load(a.settings), load(a.stats))
+    res = build_all(load(a.candidates), a.date, load(a.settings), load(a.stats), load(a.boosts))
     text = json.dumps(res, indent=2)
     if a.out:
         open(a.out, "w").write(text)
     else:
         sys.stdout.write(text + "\n")
-    show = lambda t: (f"{t['kind']:8} {t['parlayOdds']:+5d}  win {t['winChance']:.0%}  "
+    show = lambda t: (f"{t['kind']:8} {t.get('book', '?'):10} {t['parlayOdds']:+5d}  win {t['winChance']:.0%}  "
                       f"ev {t['ev']:+.1%}  | " + " + ".join(f"{l['pick']} ({l['odds']:+d})" for l in t["legs"]))
     print(f"{len(res['board'])} board bets, {len(res['dropped'])} candidates dropped (see `dropped`)", file=sys.stderr)
-    for t in ([res["big"]] if res["big"] else []) + res["pairs"] + list(res["parlays"].values()):
+    for t in ([res["big"]] if res["big"] else []) + res["pairs"] + list(res["parlays"].values()) + res["boosts"]:
         print(show(t), file=sys.stderr)
 
 

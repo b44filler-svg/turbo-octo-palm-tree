@@ -30,13 +30,16 @@ report; the researcher fixes and re-submits.
    price on a board item usually isn't).
 
 2. **Prices (re-verify each one yourself).** For every leg on the Big Bet, the
-   Power Pairs and the 3-leg parlays, search for the current FanDuel price for
-   the exact line (Covers, Action Network, OddsShark, VegasInsider, FanDuel
+   Power Pairs, the 3-leg parlays and the boosts, search for the current price
+   at the book the leg names (`book`) for the exact line (Covers, Action Network, OddsShark, VegasInsider, FanDuel
    Research). Do not open the researcher's source links first; find your own.
    - Price moved 10+ cents against the pick, or the line itself changed
      (e.g. 24.5 -> 25.5): FIX, with the new price.
-   - Price isn't FanDuel's and FanDuel's can't be found: FIX for big/pair/parlay
-     legs (say "confirm in app" is not enough for the Big Bet).
+   - Price can't be confirmed at the named book: FIX (move the leg to a book
+     where you can confirm it, or drop it). A parlay's legs must all be
+     available at its one book.
+   - Boosts: confirm the promo exists today with those terms (percent, legs,
+     minimum odds, sport, max stake) and that the ticket meets them.
    - Also find a sharp or consensus price for both sides and check that
      `fairProb` is within 3 points of what you get.
 

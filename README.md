@@ -60,15 +60,19 @@ land side by side, which is the "high win % *and* high payout" trade-off.
   "pick": "Austin Reaves Under 5.5 Assists", "market": "Assists",
   "type": "prop under",
   "team": "Los Angeles Lakers", "player": "Austin Reaves",
-  "odds": -125,
+  "prices": {"FanDuel": -125, "Courtside": -120},
   "sharpOdds": [-145, 125], "sharpSource": "Pinnacle",
-  "source": "FanDuel Sportsbook",
+  "source": "Covers odds grid",
   "hitRates": {"season": [3, 4], "last10": [7, 10], "last5": [4, 5], "lastSeason": [45, 70]},
   "median": "median 4 ast vs line 5.5",
   "star": false, "adjust": 0.01, "newsAdjust": 0.0, "lineMovedAgainst": false,
   "why": "Under in 45 of 70 last season; Suns allow the 4th-fewest assists."
 }
 ```
+
+`prices` holds the price at each of Bob's books (settings `books`); singles use the best one, and each parlay is built at the one book that pays most. A single `odds` + `source` still works.
+
+Promos go in a separate `--boosts` file: `[{"id","book","title","pct":0.3,"minLegs":2,"maxLegs":3,"minLegOdds":-250,"sport":"NBA","maxStake":25}]`.
 
 `type` is one of `moneyline`, `spread`, `total over`, `total under`,
 `team total over`, `team total under`, `prop over`, `prop under`. `team` is the

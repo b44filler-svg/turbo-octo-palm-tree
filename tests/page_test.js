@@ -17,6 +17,7 @@ const add = (id, t, extra = {}) => { parlays[id] = { ...t, date: today, createdA
 if (built.big) add(`${today}-big`, built.big, { audit: { status: "PASS", note: "prices re-checked at FanDuel" } });
 (built.pairs || []).forEach((p, i) => add(`${today}-pair-${i + 1}`, p, { audit: { status: "WARN", note: "one price from Covers" } }));
 Object.entries(built.parlays || {}).forEach(([s, p]) => add(`${today}-${s.toLowerCase()}`, p));
+(built.boosts || []).forEach((p, i) => add(`${today}-boost-${i + 1}`, p));
 // A graded, placed ticket from an earlier day for the Profit, Calendar and History tabs.
 const old = JSON.parse(fs.readFileSync(path.join(__dirname, "fixtures", "ticket_2026-10-26-nfl.json"), "utf8"));
 parlays["2026-10-20-nfl"] = { ...old, date: "2026-10-20", createdAt: "2026-10-20T15:00:00Z", result: "won", placed: true, stake: 20 };
@@ -99,10 +100,12 @@ function mock(DATA) {
       parlay: document.querySelectorAll(".ticket.k-parlay3").length, board: document.querySelectorAll(".board li").length,
       sizing: document.querySelector(".sizing")?.textContent || "", audit: document.querySelectorAll(".audit").length,
       glance: document.querySelectorAll(".glance li").length,
+      tagBook: [...document.querySelectorAll(".ticket .tag")].some(t => /FanDuel|Courtside/.test(t.textContent)),
       feed: document.querySelectorAll(".feed li").length, gtime: document.querySelector(".glance .gtime")?.textContent || "",
     }));
     if (counts.big !== 1 || counts.pair < 1 || counts.parlay < 1 || counts.board < 1) fail(`${width}px Today counts ${JSON.stringify(counts)}`);
     if (counts.feed !== 2 || !/Updated .* ET/.test(counts.gtime)) fail(`${width}px updates feed ${counts.feed}, time line "${counts.gtime}"`);
+    if (!counts.tagBook) fail(`${width}px tickets don't show their sportsbook`);
     if (counts.glance < 4) fail(`${width}px glance card has ${counts.glance} rows`);
     if (!/up to \$\d+|sit this one out/.test(counts.sizing)) fail(`${width}px Big Bet size guide missing: ${counts.sizing}`);
     await overflow("today");
@@ -123,13 +126,24 @@ function mock(DATA) {
     if (gc < 2) fail(`${width}px only ${gc} game cards`);
     await overflow("games");
     await page.screenshot({ path: path.join(process.env.SHOTS || "/tmp", `games-${width}.png`), fullPage: true });
+    // Boosts tab shows the boosted ticket with its before/after odds and capped stakes
+    await page.click("#tab-boosts");
+    const bq = await page.evaluate(() => ({
+      tickets: document.querySelectorAll("#boostsBox .ticket.k-boost").length,
+      math: document.querySelector("#boostsBox .boost-math")?.textContent || "",
+      stakes: [...document.querySelectorAll("#boostsBox .stake b")].map(b => b.textContent),
+    }));
+    if (bq.tickets < 1 || !/Without the boost/.test(bq.math)) fail(`${width}px Boosts tab: ${JSON.stringify(bq)}`);
+    if (bq.stakes.some(s => Number(s.slice(1)) > 25)) fail(`${width}px boost stakes exceed the $25 cap: ${bq.stakes}`);
+    await overflow("boosts");
+    if (process.env.SHOTS) await page.screenshot({ path: path.join(process.env.SHOTS, `boosts-${width}.png`), fullPage: true });
     for (const tab of ["calendar", "profit", "history"]) {
       await page.click(`#tab-${tab}`);
       await page.waitForTimeout(50);
       await overflow(tab);
     }
     const kindRows = await page.locator("#byKind tr").count();
-    if (kindRows !== 4) fail(`${width}px By bet type table has ${kindRows} rows`);
+    if (kindRows !== 5) fail(`${width}px By bet type table has ${kindRows} rows`);
     await page.click("#tab-history");
     await page.locator("#filters button", { hasText: "Big Bet" }).click();
     const hrows = await page.locator("#hist li").count();

@@ -36,11 +36,19 @@ button:disabled{opacity:.55;cursor:not-allowed}
 .num{font-family:var(--mono);font-variant-numeric:tabular-nums}
 
 /* tabs */
-.tabs{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;display:flex;background:var(--bg);padding-block:6px;gap:5px}
+.tabs{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;display:flex;background:var(--bg);padding-block:6px;gap:5px;overflow-x:auto;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
 body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--bg)}
 .tabs button{flex:1 1 auto;font:900 1rem/1 var(--display);text-transform:uppercase;letter-spacing:.03em;padding:11px 4px;background:var(--paper);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .tabs button[aria-selected="true"]{background:var(--ink);color:var(--paper);border-color:var(--ink)}
-@media (max-width:420px){.tabs{gap:4px}.tabs button{font-size:.84rem;letter-spacing:0;padding-inline:2px}}
+@media (max-width:480px){.tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px}.tabs button{font-size:.9rem;letter-spacing:.02em;padding:10px 4px}}
+.book{display:inline-block;font:700 .66rem/1 var(--mono);letter-spacing:.08em;text-transform:uppercase;padding:3px 5px;border-radius:3px;background:var(--accent);color:var(--accent-ink);vertical-align:1px;margin-left:4px}
+.ticket.k-boost{border-top:5px solid var(--good)}
+.boost-head{background:var(--paper);border:1px solid var(--line);border-radius:6px;padding:16px 18px}
+.boost-head h2{font:900 1.5rem/1 var(--display);text-transform:uppercase;margin:0 0 6px}
+.boost-head p{margin:0;color:var(--muted);font-size:.92rem;max-width:62ch}
+.boost-math{margin:0;padding:10px 18px;border-top:1px solid var(--line);font:500 .82rem var(--mono);color:var(--muted)}
+.boost-math b{color:var(--good)}
 .view{display:grid;gap:20px;min-width:0}
 .view[hidden]{display:none}
 
@@ -282,6 +290,7 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
   <nav class="tabs" role="tablist" aria-label="Sections">
     <button role="tab" id="tab-today" aria-controls="v-today" data-v="today">Today</button>
     <button role="tab" id="tab-games" aria-controls="v-games" data-v="games">Games</button>
+    <button role="tab" id="tab-boosts" aria-controls="v-boosts" data-v="boosts">Boosts</button>
     <button role="tab" id="tab-calendar" aria-controls="v-calendar" data-v="calendar">Calendar</button>
     <button role="tab" id="tab-profit" aria-controls="v-profit" data-v="profit">Profit</button>
     <button role="tab" id="tab-history" aria-controls="v-history" data-v="history">History</button>
@@ -298,6 +307,7 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
       <div><b>Power Pair</b><span>Two strong legs that are too pricey alone but pay about even money or better together.</span></div>
       <div><b>3-Leg Parlay</b><span>One per sport. The combo closest to a lock that still pays about 2-to-1.</span></div>
     </div>
+    <p class="status">Each bet shows the sportsbook with the best price; a parlay's legs are all at one book. Boosts (its own tab) are FanDuel promos with the best bet to use them on.</p>
     <p class="status">Best Bets board: single bets ranked by win chance and payout together. ★ means 55%+ to win and pays $18+ on $10.</p>
     </details>
     <div id="todayBox"><p class="note">Loading picks…</p></div>
@@ -316,6 +326,15 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
   <section class="view" id="v-games" role="tabpanel" aria-labelledby="tab-games" hidden>
     <div class="filters" id="gameFilters"></div>
     <div id="gamesBox" style="display:grid;gap:14px"><p class="note">Loading games…</p></div>
+  </section>
+
+  <!-- BOOSTS -->
+  <section class="view" id="v-boosts" role="tabpanel" aria-labelledby="tab-boosts" hidden>
+    <div class="boost-head">
+      <h2>Profit boosts</h2>
+      <p>Each morning the research run reads today's FanDuel promos and picks the bet with the best value for each boost. A boost raises the winnings, not the stake, so it can turn a fair bet into a good one. Check the boost's terms in the app before you bet.</p>
+    </div>
+    <div id="boostsBox" style="display:grid;gap:14px"></div>
   </section>
 
   <!-- CALENDAR -->
@@ -367,6 +386,11 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
         <label for="stakeIn">Default bet</label>
         <select id="stakeIn"><option value="10">$10</option><option value="20">$20</option><option value="30">$30</option></select>
       </div>
+      <div class="set-row" style="margin-top:12px">
+        <label for="booksIn">Your sportsbooks</label>
+        <input id="booksIn" style="width:100%;max-width:340px" placeholder="FanDuel, Courtside">
+      </div>
+      <p class="status" style="margin-top:6px">Picks only use prices at these books. Separate them with commas.</p>
     </div>
     <div class="panel">
       <p class="label">Model check</p>
@@ -387,9 +411,9 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 
 <script>
 const TRIGGER_ID = "trig_01A1ELnv6jNf7vrdqDf7bX3x";
-const STAKES_BY_KIND = {big:[10,25,50,100], pair:[10,20,30], parlay3:[10,20,30]};
-const KIND_LABEL = {big:"Big Bet", pair:"Power Pair", parlay3:"3-leg parlay"};
-const KIND_ORDER = ["big","pair","parlay3"];
+const STAKES_BY_KIND = {big:[10,25,50,100], pair:[10,20,30], parlay3:[10,20,30], boost:[5,10,25]};
+const KIND_LABEL = {big:"Big Bet", pair:"Power Pair", parlay3:"3-leg parlay", boost:"Boost"};
+const KIND_ORDER = ["big","pair","parlay3","boost"];
 const $ = id => document.getElementById(id);
 let db = null, docs = [], games = [], boards = [], updates = [], settings = {defaultStake:10, monthlyBudget:0}, modelStats = null;
 let chosen = {};                 // per-ticket stake chosen before placing (not saved)
@@ -417,7 +441,8 @@ function decOf(p){
   return (p.legs||[]).reduce((x,l)=>x*toDec(Number(l.odds)||-110),1);
 }
 const kindOf = p => KIND_LABEL[p.kind] ? p.kind : (p.legs||[]).length===1 ? "big" : (p.legs||[]).length===2 ? "pair" : "parlay3";
-const stakesFor = p => STAKES_BY_KIND[kindOf(p)];
+// A boost caps the stake it applies to; never offer more than that.
+const stakesFor = p => { const s = STAKES_BY_KIND[kindOf(p)], cap = Number(p.boost?.maxStake); return cap ? (s.filter(x=>x<=cap).length ? s.filter(x=>x<=cap) : [cap]) : s; };
 function defaultStakeFor(p){
   if(kindOf(p)!=="big") return Number(settings.defaultStake) || 10;
   // Big Bet: the largest size at or under the size guide, else $25 when no budget is set.
@@ -445,7 +470,7 @@ const slug = s => String(s||"").toLowerCase().replace(/[^a-z0-9]+/g,"-").replace
 const gameFor = (game, date) => games.find(g => dkey(g)===date && slug(g.game)===slug(game));
 
 /* ---------- tabs ---------- */
-const VIEWS = ["today","games","calendar","profit","history"];
+const VIEWS = ["today","games","boosts","calendar","profit","history"];
 function show(v){
   if(!VIEWS.includes(v)) v = "today";
   VIEWS.forEach(x=>{ $("v-"+x).hidden = x!==v; $("tab-"+x).setAttribute("aria-selected", x===v); });
@@ -523,7 +548,10 @@ function ticket(p){
   const art = el("article","ticket k-" + kind);
   const head = el("div","t-head");
   const hl = el("div"); hl.append(el("h2",null,p.title || KIND_LABEL[kind]), el("p",null,[prettyDate(p.date), p.firstStart].filter(Boolean).join(" · ")));
-  const tagText = kind==="big" ? "Big Bet · straight · " + fmtAm(Number((p.legs||[])[0]?.odds)) : KIND_LABEL[kind] + " · " + fmtAm(Number(p.parlayOdds)||toAm(dec));
+  const bookTxt = p.book ? " · " + p.book : "";
+  const tagText = kind==="big" ? "Big Bet · " + fmtAm(Number((p.legs||[])[0]?.odds)) + bookTxt
+    : kind==="boost" ? Math.round(Number(p.boost?.pct||0)*100) + "% boost · " + fmtAm(Number(p.parlayOdds)||toAm(dec)) + bookTxt
+    : KIND_LABEL[kind] + " · " + fmtAm(Number(p.parlayOdds)||toAm(dec)) + bookTxt;
   head.append(hl, el("span","tag " + res, res==="open" ? tagText : res==="won" ? "Won" : res==="lost" ? "Lost" : "Void · refunded"));
   art.append(head);
   if(p.lateCheck && p.lateCheck.status && res==="open"){
@@ -538,7 +566,9 @@ function ticket(p){
   (p.legs||[]).forEach(l=>{
     const li = el("li","leg"), r = l.result || "open";
     li.append(el("span","dot " + r, r==="won"?"✓":r==="lost"?"✕":""));
-    const pk = el("div","pick",l.pick); pk.append(el("div","mkt",[l.sport,l.game,l.start,l.market].filter(Boolean).join(" · ")));
+    const pk = el("div","pick",l.pick);
+    if(l.book && !p.book) pk.append(el("span","book",l.book));
+    pk.append(el("div","mkt",[l.sport,l.game,l.start,l.market].filter(Boolean).join(" · ")));
     li.append(pk, el("div","odds",fmtAm(Number(l.odds))));
     li.append(simpleLine(l, r));
     if(l.why) li.append(el("p","why",l.why));
@@ -547,7 +577,8 @@ function ticket(p){
     const st = legStats(l, r); if(st.childNodes.length) more.append(st);
     more.append(el("p",null,"Model = our win chance. Book = what FanDuel's price implies. Edge = the gap between them; positive is good."));
     if(l.articleNote) more.append(el("p",null,"Experts: " + l.articleNote));
-    if(l.source) more.append(el("p",null,"Odds from: " + l.source));
+    if(l.book) more.append(el("p",null,"Best price at " + l.book + (l.otherPrices && Object.keys(l.otherPrices).length ? " (also " + Object.entries(l.otherPrices).map(([b,o])=>b + " " + fmtAm(Number(o))).join(", ") + ")" : "")));
+    else if(l.source) more.append(el("p",null,"Odds from: " + l.source));
     li.append(more);
     if(l.game && gameFor(l.game, dkey(p))){ const gb = el("button","gamelink","Game info →"); gb.type="button"; gb.onclick = ()=>openGame(l.game, dkey(p)); li.append(gb); }
     ul.append(li);
@@ -727,9 +758,11 @@ function renderGlance(list, board){
     const win = p.winChance ? Math.round(p.winChance*100) + "% to win" : "";
     const pays = "$10 pays " + money(10*dec);
     const status = p.result && p.result!=="open" ? (p.result==="won"?"✓ Won":p.result==="lost"?"✕ Lost":"Void") : p.lateCheck?.status==="skip today" ? "Skip today" : p.lateCheck?.status==="swap a leg" ? "Swap a leg" : "";
-    const label = k==="big" ? "Big Bet · best for a bigger stake" : k==="pair" ? "Power Pair · 2 legs" : sportOf(p) + " parlay · 3 legs";
+    const label = (k==="big" ? "Big Bet · best for a bigger stake" : k==="pair" ? "Power Pair · 2 legs" : sportOf(p) + " parlay · 3 legs") + (p.book ? " · at " + p.book : "");
     row(label, legsText(p), fmtAm(k==="big" ? Number(p.legs?.[0]?.odds) : Number(p.parlayOdds)||toAm(dec)), [win, pays, status, p.placed ? "You bet $" + stakeOf(p) : ""].filter(Boolean).join(" · "), "s-" + sectionOf(p));
   });
+  const nb = docs.filter(d => dkey(d) === todayET() && kindOf(d) === "boost").length;
+  if(nb){ const li = el("li"), bt = el("button"); bt.type = "button"; bt.append(el("span","gk","FanDuel boosts"), el("span","gp", nb + " boosted bet" + (nb>1?"s":"") + " picked for today's promos"), el("span","gv","→")); bt.onclick = ()=>show("boosts"); li.append(bt); ul.append(li); }
   const top = board && (board.items||[])[0];
   if(top) row("Top single bet" + (top.sweetSpot ? " · ★ sweet spot" : ""), top.pick, fmtAm(Number(top.odds)), [has(top.modelProb) ? pc(top.modelProb) + " to win" : "", "$10 pays " + money(10*toDec(Number(top.odds)))].filter(Boolean).join(" · "), "s-board");
   card.append(ul);
@@ -746,7 +779,7 @@ const SECTION_HEAD = {big:["Big Bet","Best for a bigger stake: one bet, highest 
 function renderToday(){
   const box = $("todayBox"); box.replaceChildren();
   const t = todayET();
-  const todays = docs.filter(d => dkey(d) === t && !/placed$/.test(d._id));
+  const todays = docs.filter(d => dkey(d) === t && !/placed$/.test(d._id) && kindOf(d) !== "boost");
   const mine = docs.filter(d => dkey(d) === t && /placed$/.test(d._id));
   const found = boards.find(b => dkey(b) === t);
   const board = found && (found.items||[]).length ? found : null;
@@ -1000,6 +1033,7 @@ function renderProfit(){
   }
   $("budgetIn").value = settings.monthlyBudget ? "$" + settings.monthlyBudget : "";
   $("stakeIn").value = String(settings.defaultStake || 10);
+  if(document.activeElement !== $("booksIn")) $("booksIn").value = (settings.books || ["FanDuel","Courtside"]).join(", ");
 
   // calibration
   const mp = legs.filter(x=>Number(x.modelProb)>0);
@@ -1053,6 +1087,7 @@ async function saveSettings(patch){
 }
 $("budgetIn").addEventListener("change", e=>{ const v = Math.max(0, Math.round(Number(String(e.target.value).replace(/[^\d.]/g,""))||0)); saveSettings({monthlyBudget:v}); });
 $("stakeIn").addEventListener("change", e=>saveSettings({defaultStake:Number(e.target.value)}));
+$("booksIn").addEventListener("change", e=>{ const books = String(e.target.value).split(",").map(x=>x.trim()).filter(Boolean); if(books.length) saveSettings({books}); });
 
 /* ---------- HISTORY ---------- */
 const FILTERS = [["all","All"],["placed","My bets"],["won","Won"],["lost","Lost"],["open","Pending"]];
@@ -1097,7 +1132,23 @@ $("refresh").onclick = async ()=>{
 };
 
 /* ---------- boot ---------- */
-function renderAll(){ renderToday(); renderGames(); renderCalendar(); renderProfit(); renderHistory(); }
+/* ---------- BOOSTS ---------- */
+function renderBoosts(){
+  const box = $("boostsBox"); box.replaceChildren();
+  const t = todayET();
+  const list = docs.filter(d => dkey(d) === t && kindOf(d) === "boost");
+  if(!list.length){ box.append(el("p","note","No boosted bets yet today. When FanDuel posts profit boosts, the morning run picks the best bet for each one and it shows up here.")); return; }
+  list.forEach(p=>{
+    const art = ticket(p), b = p.boost || {};
+    const m = el("p","boost-math");
+    m.append("Without the boost: " + fmtAm(Number(p.baseOdds)) + " · with it: ", el("b",null,fmtAm(Number(p.parlayOdds))), (b.maxStake ? " · max stake $" + b.maxStake : "") + (b.expires ? " · ends " + b.expires : ""));
+    art.insertBefore(m, art.children[1] || null);
+    if(b.title){ const h = el("p","sport-head",b.title); box.append(h); }
+    box.append(art);
+  });
+}
+
+function renderAll(){ renderToday(); renderGames(); renderBoosts(); renderCalendar(); renderProfit(); renderHistory(); }
 // Only the small time line is refreshed, so open details and chosen bet sizes stay as they are.
 setInterval(()=>{ const g = document.querySelector(".glance .gtime"); if(g) g.textContent = freshness(); }, 60000);
 renderAll();
