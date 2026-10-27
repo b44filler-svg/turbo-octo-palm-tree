@@ -46,7 +46,7 @@ report; the researcher fixes and re-submits.
    game starting within 30 minutes is a REJECT for that leg.
 
 4. **Stat claims.** For the Big Bet and every prop in the Power Pairs, re-count
-   `hitRate` and `median` from a box-score source (Basketball-Reference,
+   the hit rates (`hitRates` in CANDIDATES, `hitRate` text on the leg) and `median` from a box-score source (Basketball-Reference,
    Pro-Football-Reference, Baseball-Reference, ESPN, StatMuse). A hit rate off
    by more than one game, or a median on the wrong side of the line: FIX.
 

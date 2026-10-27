@@ -15,7 +15,7 @@ research (web) ──► candidates.json ──► picks.build ──► draft.j
 
 | Type | What it is | Built for | Thresholds (`picks/build.py`) |
 |---|---|---|---|
-| **Best Bets board** | Every single with positive value, ranked | Win chance **and** payout together | 50%+ win, value > 0, ranked by quarter-Kelly growth; ★ sweet spot = 55%+ and pays $18+ on $10 |
+| **Best Bets board** | Top 10 singles with positive value, ranked | Win chance **and** payout together | 50%+ win, value > 0, ranked by quarter-Kelly growth; ★ sweet spot = 55%+ and pays $18+ on $10 |
 | **Big Bet** | One straight bet | A bigger stake | 60%+ win, edge 2.5+ pts, value +3%+, -300 to +150, sharp fair price required |
 | **Power Pair** | 2-leg parlay | Strong legs that are too juiced alone | each leg 60%+, joint 42%+, value +2%+, pays 1.9x-3.6x; no leg reused from the Big Bet |
 | **3-leg parlay** | One per sport | Closest to a lock that still pays | legs -500 to -150, max one leg with negative edge, $18+ per $10, value >= 0 |

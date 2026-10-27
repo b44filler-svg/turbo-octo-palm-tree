@@ -374,8 +374,8 @@ function defaultStakeFor(p){
   if(kindOf(p)!=="big") return Number(settings.defaultStake) || 10;
   // Big Bet: the largest size at or under the size guide, else $25 when no budget is set.
   const g = bigGuide(p), opts = stakesFor(p);
-  if(g === null) return 25;
-  return opts.filter(s=>s<=g.most).pop() || opts[0];
+  if(g === null) return Number(settings.defaultStake) || 10;
+  return opts.filter(s=>s<=g.most).pop() || 0;   // 0 = guide says sit out; no size picked for you
 }
 const stakeOf = p => Number(p.stake) || 10;
 const SPORT_ORDER = ["NFL","NBA","MLB","Mix"];
@@ -392,6 +392,7 @@ function netOf(p){
   return 0;
 }
 const graded = p => p.result==="won" || p.result==="lost";
+const settled = p => graded(p) || p.result==="void";   // void = refunded, not pending
 const slug = s => String(s||"").toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"");
 const gameFor = (game, date) => games.find(g => dkey(g)===date && slug(g.game)===slug(game));
 
@@ -463,7 +464,7 @@ function ticket(p){
   const head = el("div","t-head");
   const hl = el("div"); hl.append(el("h2",null,p.title || KIND_LABEL[kind]), el("p",null,[prettyDate(p.date), p.firstStart].filter(Boolean).join(" · ")));
   const tagText = kind==="big" ? "Big Bet · straight · " + fmtAm(Number((p.legs||[])[0]?.odds)) : KIND_LABEL[kind] + " · " + fmtAm(Number(p.parlayOdds)||toAm(dec));
-  head.append(hl, el("span","tag " + res, res==="open" ? tagText : res==="won" ? "Won" : "Lost"));
+  head.append(hl, el("span","tag " + res, res==="open" ? tagText : res==="won" ? "Won" : res==="lost" ? "Lost" : "Void · refunded"));
   art.append(head);
   if(p.lateCheck && p.lateCheck.status && res==="open"){
     const s = String(p.lateCheck.status);
@@ -518,7 +519,7 @@ function ticket(p){
   const mr = el("div","meta-row");
   mr.append(el("span",null, p.winChance ? (p.candidates?"Model chance ":"Hit chance ") + "~" + Math.round(p.winChance*100) + "%" : "Hit chance —"),
             has(p.ev) ? el("span", cls(Number(p.ev)), "Model value " + (p.ev>0?"+":"") + (p.ev*100).toFixed(1) + "%") : el("span"),
-            el("span",null, "Profit if it hits: +" + money(cur*dec - cur)));
+            el("span",null, cur ? "Profit if it hits: +" + money(cur*dec - cur) : "No size picked"));
   art.append(mr);
   if(kind==="big" && res==="open") art.append(sizingNote(p));
   if(p.finalNote) art.append(el("p","final",p.finalNote));
@@ -527,8 +528,8 @@ function ticket(p){
   const act = el("div","t-actions");
   const busy = !!saving[p._id], note = notes[p._id];
   if(!p.placed){
-    const pb = el("button", "place", busy ? "Saving…" : "I placed this bet · $" + cur);
-    pb.disabled = busy;
+    const pb = el("button", "place", busy ? "Saving…" : cur ? "I placed this bet · $" + cur : "Pick a bet size first");
+    pb.disabled = busy || !cur;
     pb.onclick = ()=>savePlaced(p, true, cur);
     act.append(pb);
   } else {
@@ -740,7 +741,7 @@ function renderCalendar(){
     mNet += net; placed.forEach(p=>{ mBet += stakeOf(p); if(p.result==="won") mW++; if(p.result==="lost") mL++; });
     let state = "";
     const pool = placed.length ? placed : items;
-    if(pool.some(p=>!graded(p))) state = "open";
+    if(pool.some(p=>!settled(p))) state = "open";
     else if(pool.length) state = (placed.length ? net>=0 : pool.some(p=>p.result==="won")) ? "won" : "lost";
     const cell = el("button","day" + (items.length?" has":"") + (state?" "+state:"") + (key===t?" today":"") + (key===calSel?" sel":""));
     cell.type = "button"; cell.disabled = !items.length;
@@ -772,7 +773,7 @@ function renderProfit(){
   const w = done.filter(p=>p.result==="won").length, l = done.length - w;
   const wagered = done.reduce((s,p)=>s+stakeOf(p),0);
   const net = done.reduce((s,p)=>s+netOf(p),0);
-  const pending = placed.filter(p=>!graded(p));
+  const pending = placed.filter(p=>!settled(p));
   const roi = wagered ? net/wagered*100 : 0;
   // streak
   const seq = [...done].sort((a,b)=>dkey(a)<dkey(b)?-1:1);
@@ -908,7 +909,10 @@ async function saveSettings(patch){
   settings = Object.assign({}, settings, patch);
   renderAll();
   if(!db) return;
-  try{ await db.collection("settings").doc("main").set(settings); }catch{ setStatus("Couldn't save settings.", true); }
+  // Merge only the changed fields, so a save can never wipe other settings (like neverAgainst).
+  const ref = db.collection("settings").doc("main");
+  try{ await ref.update(patch); }
+  catch{ try{ await ref.set(Object.assign({neverAgainst:["Philadelphia Eagles"]}, settings)); }catch{ setStatus("Couldn't save settings.", true); } }
 }
 $("budgetIn").addEventListener("change", e=>{ const v = Math.max(0, Math.round(Number(String(e.target.value).replace(/[^\d.]/g,""))||0)); saveSettings({monthlyBudget:v}); });
 $("stakeIn").addEventListener("change", e=>saveSettings({defaultStake:Number(e.target.value)}));

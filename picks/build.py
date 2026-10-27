@@ -61,12 +61,44 @@ def ticket(kind, legs, date, sport=None, **extra):
     return doc
 
 
-def eligible(scored, never_against):
+def problem(c):
+    """Why a candidate can't be used, or None. Bad legs are dropped, not fatal."""
+    for f in ("sport", "game", "pick", "market", "type", "odds", "source"):
+        if c.get(f) in (None, ""):
+            return f"missing `{f}`"
+    t = str(c["type"]).lower()
+    if t not in rules.TYPES:
+        return f"unknown type {c['type']!r}"
+    if t not in rules.NEUTRAL and not c.get("team"):
+        return "missing `team` (needed for the never-against rule)"
+    if t.startswith("prop") and not c.get("player"):
+        return "prop without `player`"
+    if not rules.game_teams(c["game"]):
+        return f"game {c['game']!r} isn't 'Away @ Home'"
+    try:
+        om.am_to_dec(c["odds"])
+    except (TypeError, ValueError):
+        return f"bad odds {c['odds']!r}"
+    return None
+
+
+def prepare(candidates, shrink, never_against):
+    """Score every usable candidate; return (legs, dropped)."""
     ok, dropped = [], []
-    for l in scored:
-        prot = rules.loyalty_violation(l, never_against)
-        if prot:
-            dropped.append((l, f"bets against {prot}"))
+    for c in candidates:
+        why = problem(c)
+        if not why:
+            try:
+                l = score(c, shrink)
+            except (TypeError, ValueError, KeyError) as e:
+                why = f"can't score: {e}"
+        if not why and l["fairProb"] is None:
+            why = "no market price to anchor the model (stats only)"
+        if not why:
+            prot = rules.loyalty_violation(l, never_against)
+            why = f"bets against {prot}" if prot else None
+        if why:
+            dropped.append((c, why))
         else:
             ok.append(l)
     return ok, dropped
@@ -122,11 +154,11 @@ def build_pairs(legs, date, exclude=()):
 
 
 def diff_games(t):
-    return len({l["game"] for l in t["legs"]})
+    return len({rules.game_key(l["game"]) for l in t["legs"]})
 
 
 def build_parlay(legs, date, sport):
-    pool = [l for l in legs if l["sport"] == sport and l["edge"] >= PARLAY["soft_leg_edge"]
+    pool = [l for l in legs if str(l["sport"]).upper() == sport and l["edge"] >= PARLAY["soft_leg_edge"]
             and PARLAY["min_odds"] <= l["odds"] <= PARLAY["max_odds"]]
     found = []
     for combo in itertools.combinations(pool, 3):
@@ -144,8 +176,19 @@ def build_parlay(legs, date, sport):
     close = [t for t in found if top - t["winChance"] <= 0.02]
     best = max(close, key=lambda t: sum(l["edge"] for l in t["legs"]))
     chosen = {l["pick"] for l in best["legs"]}
-    backups = [l for l in pool if l["pick"] not in chosen and l["edge"] >= 0
-               and combo_ok(best["legs"][:2] + [l])]
+
+    def swaps_in(l):
+        # The backup must work in place of ANY of the three legs.
+        for i in range(3):
+            legs3 = best["legs"][:i] + best["legs"][i + 1:] + [l]
+            if not combo_ok(legs3):
+                return False
+            t = ticket("parlay3", legs3, date, sport=sport)
+            if t["payout10"] < PARLAY["min_payout10"] or t["ev"] < PARLAY["min_ev"]:
+                return False
+        return True
+
+    backups = [l for l in pool if l["pick"] not in chosen and l["edge"] >= 0 and swaps_in(l)]
     if backups:
         best["backup"] = max(backups, key=lambda l: l["modelProb"])
     return best, found[:5]
@@ -154,15 +197,17 @@ def build_parlay(legs, date, sport):
 def build_all(candidates, date, settings=None, stats=None):
     settings = settings or {}
     settings = settings.get("data", settings)   # accept a raw db export too
+    if not isinstance(settings.get("neverAgainst"), list):
+        # Never build without the loyalty rule; an empty list must be explicit.
+        raise ValueError("settings need a `neverAgainst` list (use [] for none)")
     stats = (stats or {}).get("data", stats)
     shrink = float((stats or {}).get("shrink", 0.5))
-    scored = [score(c, shrink) for c in candidates]
-    legs, dropped = eligible(scored, settings.get("neverAgainst", []))
+    legs, dropped = prepare(candidates, shrink, settings["neverAgainst"])
     board = build_board(legs)
     big = build_big(legs, date)
     pairs = build_pairs(legs, date, exclude={big["legs"][0]["pick"]} if big else ())
     parlays, top5 = {}, {}
-    for sport in sorted({l["sport"] for l in legs}):
+    for sport in sorted({str(l["sport"]).upper() for l in legs}):
         best, alts = build_parlay(legs, date, sport)
         if best:
             parlays[sport] = best
@@ -191,7 +236,7 @@ def main(argv=None):
         sys.stdout.write(text + "\n")
     show = lambda t: (f"{t['kind']:8} {t['parlayOdds']:+5d}  win {t['winChance']:.0%}  "
                       f"ev {t['ev']:+.1%}  | " + " + ".join(f"{l['pick']} ({l['odds']:+d})" for l in t["legs"]))
-    print(f"{len(res['board'])} board bets, {len(res['dropped'])} legs dropped by loyalty rule", file=sys.stderr)
+    print(f"{len(res['board'])} board bets, {len(res['dropped'])} candidates dropped (see `dropped`)", file=sys.stderr)
     for t in ([res["big"]] if res["big"] else []) + res["pairs"] + list(res["parlays"].values()):
         print(show(t), file=sys.stderr)
 

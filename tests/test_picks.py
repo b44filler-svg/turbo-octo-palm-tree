@@ -225,3 +225,124 @@ def test_audit_math_is_independent_of_oddsmath(monkeypatch, built):
     # If the builder's math were broken, the audit must still use its own.
     monkeypatch.setattr(om, "am_to_dec", lambda am: 99.0)
     assert audit.dec(-110) == pytest.approx(1.909091, abs=1e-6)
+
+
+# ---------- regressions from the independent review ----------
+
+@pytest.mark.parametrize("game", ["DAL @ PHI", "Dallas @ Philadelphia", "Cowboys - Eagles",
+                                  "Cowboys@Eagles", "Dallas Cowboys at Philadelphia Eagles", "Cowboys vs Eagles"])
+def test_loyalty_rule_any_game_spelling(game):
+    leg = {"sport": "NFL", "game": game, "type": "moneyline", "team": "Dallas Cowboys", "pick": "Dallas ML"}
+    assert rules.loyalty_violation(leg, EAGLES)
+    ok = {**leg, "team": "Philadelphia Eagles", "pick": "Eagles ML"}
+    assert not rules.loyalty_violation(ok, EAGLES)
+
+
+def test_loyalty_fails_closed_on_unreadable_game():
+    leg = {"sport": "NFL", "game": "Eagles game", "type": "total under", "pick": "Under 44.5"}
+    assert rules.loyalty_violation(leg, EAGLES)
+
+
+def test_philly_city_does_not_trip_other_sports():
+    leg = {"sport": "MLB", "game": "New York Mets @ Philadelphia Phillies", "type": "moneyline", "team": "New York Mets", "pick": "Mets ML"}
+    assert not rules.loyalty_violation(leg, EAGLES)
+
+
+def test_build_refuses_missing_loyalty_settings():
+    with pytest.raises(ValueError):
+        build.build_all(load("candidates.json"), "2026-10-27", {})
+    with pytest.raises(ValueError):
+        build.build_all(load("candidates.json"), "2026-10-27", {"monthlyBudget": 100})
+
+
+def test_audit_cli_fails_without_settings(tmp_path, built):
+    f = tmp_path / "d.json"
+    f.write_text(json.dumps(built))
+    assert audit.main([str(f)]) == 1
+
+
+def test_bad_candidates_are_dropped_not_fatal():
+    good = load("candidates.json")
+    bad = [{**good[3], "pick": "one-sided", "sharpOdds": [-150]},
+           {**good[3], "pick": "no sport", "sport": None},
+           {**good[3], "pick": "bad odds", "odds": 50},
+           {**good[5], "pick": "stats only", "sharpOdds": None}]
+    res = build.build_all(good + bad, "2026-10-27", {"neverAgainst": EAGLES})
+    why = {d["pick"]: d["why"] for d in res["dropped"]}
+    assert {"no sport", "bad odds", "stats only"} <= set(why)
+    assert res["big"] and res["parlays"]
+
+
+def test_build_output_never_fails_audit_at_rounding_edges():
+    # A leg whose edge sits right at the Big Bet 2.5-point line after rounding.
+    base = {"sport": "NBA", "game": "Bulls @ Heat", "market": "Points", "type": "prop over", "team": "Heat",
+            "source": "FanDuel Sportsbook", "sharpSource": "Pinnacle"}
+    cands = []
+    for i, fair in enumerate([0.6502, 0.6505, 0.651, 0.6498]):
+        cands.append({**base, "player": f"P{i}", "pick": f"P{i} under", "odds": -167, "fairProb": fair, "fairFlag": False})
+    res = build.build_all(cands, "2026-10-27", {"neverAgainst": []})
+    assert [r.tid for r in audit.audit(res, [], NOW) if r.status == "FAIL"] == []
+
+
+def test_audit_catches_threshold_tampering(built):
+    bad = copy.deepcopy(built)
+    big = bad["big"]["legs"][0]
+    big["odds"] = -450
+    big["impliedProb"] = round(1 / audit.dec(-450), 3)
+    big["edge"] = round(big["modelProb"] - big["impliedProb"], 3)
+    bad["big"]["payout10"] = round(10 * audit.dec(-450), 2)
+    bad["big"]["parlayOdds"] = -450
+    bad["big"]["ev"] = round(big["modelProb"] * audit.dec(-450) - 1, 3)
+    bad["pairs"][0]["legs"][0]["modelProb"] = 0.55
+    assert {"big-odds", "big-threshold", "pair-leg"} <= codes(audit.audit(bad, EAGLES, NOW))
+
+
+def test_audit_thresholds_match_builder():
+    assert audit.BIG == build.BIG
+    assert {k: build.PAIR[k] for k in audit.PAIR} == audit.PAIR
+    assert {k: build.PARLAY[k] for k in audit.PARLAY} == audit.PARLAY
+    assert audit.BOARD["min_prob"] == build.BOARD["min_prob"]
+
+
+def test_audit_survives_garbage(built):
+    bad = copy.deepcopy(built)
+    bad["board"][0]["odds"] = 50
+    bad["big"]["parlayOdds"] = "-125"
+    reps = audit.audit(bad, EAGLES, NOW)
+    assert "bad-odds" in codes(reps)
+
+
+def test_backup_fits_in_place_of_any_leg(built):
+    for t in built["parlays"].values():
+        if t.get("backup"):
+            for i in range(3):
+                legs = t["legs"][:i] + t["legs"][i + 1:] + [t["backup"]]
+                assert not rules.ticket_conflicts(legs)
+                d = math.prod(om.am_to_dec(l["odds"]) for l in legs)
+                assert 10 * d >= 18
+
+
+def test_same_game_matches_across_spellings():
+    a = {"game": "Cowboys @ Eagles", "type": "total over", "pick": "O 44"}
+    b = {"game": "Dallas Cowboys at Philadelphia Eagles", "type": "total under", "pick": "U 47"}
+    assert rules.conflict(a, b)
+    assert rules.same_game_pairs([a, b]) == 1
+
+
+def test_conflict_details():
+    g = {"game": "Bulls @ Heat", "sport": "NBA"}
+    assert rules.conflict({**g, "type": "team total over", "team": "Heat", "pick": "a"},
+                          {**g, "type": "team total under", "team": "Heat", "pick": "b"})
+    # Passing TDs is not an anytime-TD bet
+    assert rules.conflict({**g, "type": "prop over", "player": "Q", "market": "Passing TDs", "pick": "a"},
+                          {**g, "type": "prop over", "player": "Q", "market": "Passing Yards", "pick": "b"}) is None
+
+
+def test_hit_rate_text_for_the_app(built):
+    assert "last 10" in built["big"]["legs"][0]["hitRate"]
+
+
+def test_legacy_ticket_without_kind():
+    t = load("ticket_2026-10-26-nfl.json")
+    rep = audit.check_ticket("old", t, [], NOW)
+    assert "no-fair" not in {i["code"] for i in rep.items}

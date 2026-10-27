@@ -18,6 +18,14 @@ from datetime import datetime, timezone
 from . import rules  # rules are checked again from the leg fields, not trusted from the builder
 
 TOL_P, TOL_PAY, TOL_EV = 0.0025, 0.02, 0.006
+EPS = 0.0006   # stored numbers are rounded to 3 places; thresholds allow for that
+
+# Thresholds, written out again here on purpose (tests check they match picks.build).
+# If someone loosens the builder, this checker still holds the line.
+BIG = dict(min_prob=0.60, min_edge=0.025, min_ev=0.03, min_odds=-300, max_odds=150)
+PAIR = dict(min_leg_prob=0.60, min_joint=0.42, min_dec=1.9, max_dec=3.6, min_ev=0.02)
+PARLAY = dict(min_payout10=18.0, min_ev=0.0, min_odds=-500, max_odds=-150)
+BOARD = dict(min_prob=0.50)
 LEGS_BY_KIND = {"big": 1, "pair": 2, "parlay3": 3}
 REQUIRED = ("sport", "game", "pick", "market", "type", "odds", "modelProb", "source")
 BANNED = re.compile(r"\b(lock(ed)? ?in|guarantee[ds]?|can'?t lose|sure thing|free money)\b", re.I)
@@ -28,6 +36,20 @@ def dec(am):
     if not (am >= 100 or am <= -100):
         raise ValueError(am)
     return am / 100 + 1 if am > 0 else 100 / -am + 1
+
+
+def safe_dec(am):
+    try:
+        return dec(am)
+    except (TypeError, ValueError):
+        return None
+
+
+def sgn(x):
+    try:
+        return f"{int(round(float(x))):+d}"
+    except (TypeError, ValueError):
+        return repr(x)
 
 
 def american(d):
@@ -50,28 +72,29 @@ class Report:
         return "FAIL" if "FAIL" in lv else "WARN" if "WARN" in lv else "PASS"
 
 
-def check_leg(r, l, where, never_against, now):
+def check_leg(r, l, where, never_against, now, legacy=False):
     for f in REQUIRED:
         if l.get(f) in (None, ""):
             r.fail("missing-field", f"{where}: missing `{f}`")
-    try:
-        d = dec(l["odds"])
-    except (KeyError, ValueError, TypeError):
+    d = safe_dec(l.get("odds"))
+    if d is None:
         r.fail("bad-odds", f"{where}: odds {l.get('odds')!r} is not a valid American price")
         return
     imp = 1 / d
     if l.get("impliedProb") is not None and abs(l["impliedProb"] - imp) > TOL_P:
-        r.fail("implied-math", f"{where}: impliedProb {l['impliedProb']} but {l['odds']:+d} implies {imp:.3f}")
+        r.fail("implied-math", f"{where}: impliedProb {l['impliedProb']} but {sgn(l['odds'])} implies {imp:.3f}")
     p = l.get("modelProb")
     if p is not None:
         if not 0 < p <= 0.92:
             r.fail("model-cap", f"{where}: modelProb {p} outside (0, 0.92]")
         if l.get("edge") is not None and abs(l["edge"] - (p - imp)) > TOL_P:
             r.fail("edge-math", f"{where}: edge {l['edge']} but modelProb - implied = {p - imp:.3f}")
-        if p - imp < 0:
+        if p - imp < -EPS:
             r.warn("negative-edge", f"{where}: priced worse than the model's estimate (edge {p - imp:+.3f})")
-        if l.get("fairProb") is not None and abs(p - l["fairProb"]) > 0.0705:
+        if l.get("fairProb") is not None and abs(p - l["fairProb"]) > 0.071:
             r.warn("far-from-market", f"{where}: model {p:.2f} is {abs(p - l['fairProb']):.2f} from the no-vig market {l['fairProb']:.2f}; double-check the stats")
+    if l.get("fairProb") is None and not legacy:
+        r.fail("no-fair", f"{where}: no market fair price; stats-only legs can't post")
     t = str(l.get("type", "")).lower()
     if t not in rules.NEUTRAL and not l.get("team"):
         r.fail("missing-team", f"{where}: non-total leg needs `team` so the loyalty rule can be checked")
@@ -98,17 +121,18 @@ def check_leg(r, l, where, never_against, now):
 
 def check_ticket(tid, t, never_against, now=None):
     r = Report(tid)
-    kind = t.get("kind", "parlay3")
     legs = t.get("legs") or []
+    legacy = "kind" not in t   # tickets from before bet types existed
+    kind = t.get("kind") or {1: "big", 2: "pair"}.get(len(legs), "parlay3")
     want = LEGS_BY_KIND.get(kind)
     if want is None:
         r.fail("bad-kind", f"unknown kind {kind!r}")
     elif len(legs) != want:
         r.fail("leg-count", f"{kind} needs {want} legs, has {len(legs)}")
     for i, l in enumerate(legs):
-        check_leg(r, l, f"leg {i + 1}", never_against, now)
+        check_leg(r, l, f"leg {i + 1}", never_against, now, legacy)
     if t.get("backup"):
-        check_leg(r, t["backup"], "backup", never_against, now)
+        check_leg(r, t["backup"], "backup", never_against, now, legacy)
     for i, j, why in rules.ticket_conflicts(legs):
         r.fail("conflict", f"legs {i + 1} and {j + 1}: {why}")
     if t.get("sport") and t.get("sport") != "Mix" and kind == "parlay3":
@@ -118,43 +142,54 @@ def check_ticket(tid, t, never_against, now=None):
     if BANNED.search(" ".join(str(t.get(f, "")) for f in ("title", "summary", "watch", "checkNote"))):
         r.fail("honesty", "ticket text promises a sure win")
 
-    try:
-        d = math.prod(dec(l["odds"]) for l in legs)
-    except (KeyError, ValueError, TypeError):
+    decs = [safe_dec(l.get("odds")) for l in legs]
+    if not legs or None in decs:
         return r
-    if not legs:
-        return r
+    d = math.prod(decs)
     if t.get("payout10") is not None and abs(t["payout10"] - 10 * d) > TOL_PAY:
         r.fail("payout-math", f"payout10 {t['payout10']} but the prices pay {10 * d:.2f}")
-    if t.get("parlayOdds") is not None and len(legs) > 1 and abs(t["parlayOdds"] - american(d)) > 1:
-        r.fail("odds-math", f"parlayOdds {t['parlayOdds']:+d} but the prices make {american(d):+d}")
+    if t.get("parlayOdds") is not None and len(legs) > 1 and abs(float(t["parlayOdds"]) - american(d)) > 1:
+        r.fail("odds-math", f"parlayOdds {sgn(t['parlayOdds'])} but the prices make {american(d):+d}")
     probs = [l.get("modelProb") for l in legs]
     if all(isinstance(p, (int, float)) for p in probs):
-        sg = sum(1 for i in range(len(legs)) for j in range(i + 1, len(legs)) if legs[i].get("game") == legs[j].get("game"))
+        sg = rules.same_game_pairs(legs)
         win = math.prod(probs) * 0.97 ** sg
         if t.get("winChance") is not None and abs(t["winChance"] - win) > 0.004:
             r.fail("joint-math", f"winChance {t['winChance']} but legs multiply to {win:.3f}")
         e = win * d - 1
         if t.get("ev") is not None and abs(t["ev"] - e) > TOL_EV:
             r.fail("ev-math", f"ev {t['ev']} but winChance x payout - 1 = {e:+.3f}")
+        if legacy:
+            return r
         if kind == "big":
-            l = legs[0]
-            if l["modelProb"] < 0.60 or l["modelProb"] - 1 / d < 0.025:
+            l, o = legs[0], float(legs[0]["odds"])
+            if l["modelProb"] < BIG["min_prob"] - EPS or l["modelProb"] - 1 / d < BIG["min_edge"] - EPS:
                 r.fail("big-threshold", f"Big Bet needs win >= 60% and edge >= 2.5 pts (has {l['modelProb']:.0%}, {l['modelProb'] - 1 / d:+.3f})")
+            if e < BIG["min_ev"] - EPS:
+                r.fail("big-value", f"Big Bet model value {e:+.1%} is under +3%")
+            if not BIG["min_odds"] <= o <= BIG["max_odds"]:
+                r.fail("big-odds", f"Big Bet price {sgn(o)} is outside -300 to +150")
             if l.get("fairFlag"):
                 r.fail("big-thin", "Big Bet can't rest on a thin fair price")
-        if kind == "pair" and not (1.9 <= d <= 3.6 and win >= 0.42):
-            r.fail("pair-threshold", f"Power Pair needs 1.9x-3.6x payout and 42%+ win (has {d:.2f}x, {win:.0%})")
-        if kind == "pair" and e < 0.02:
-            r.fail("pair-value", f"Power Pair model value {e:+.1%} is under +2%")
+        if kind == "pair":
+            if not (PAIR["min_dec"] - 0.005 <= d <= PAIR["max_dec"] + 0.005 and win >= PAIR["min_joint"] - EPS):
+                r.fail("pair-threshold", f"Power Pair needs 1.9x-3.6x payout and 42%+ win (has {d:.2f}x, {win:.0%})")
+            if e < PAIR["min_ev"] - EPS:
+                r.fail("pair-value", f"Power Pair model value {e:+.1%} is under +2%")
+            weak = [l["pick"] for l in legs if l["modelProb"] < PAIR["min_leg_prob"] - EPS]
+            if weak:
+                r.fail("pair-leg", f"Power Pair legs must each be 60%+: {weak}")
         if kind == "parlay3":
-            if 10 * d < 18 - TOL_PAY:
+            if 10 * d < PARLAY["min_payout10"] - TOL_PAY:
                 r.fail("parlay-payout", f"$10 pays {10 * d:.2f}, under the $18 floor")
-            if e < 0:
+            if e < PARLAY["min_ev"] - EPS:
                 r.fail("parlay-value", f"negative model value {e:+.1%}")
-            neg = sum(1 for l in legs if l["modelProb"] - 1 / dec(l["odds"]) < 0)
+            neg = sum(1 for l in legs if l["modelProb"] - 1 / dec(l["odds"]) < -EPS)
             if neg > 1:
                 r.fail("filler-legs", f"{neg} legs with negative edge (max 1)")
+            out = [sgn(l["odds"]) for l in legs if not PARLAY["min_odds"] <= float(l["odds"]) <= PARLAY["max_odds"]]
+            if out:
+                r.fail("parlay-odds", f"3-leg parlay legs must be -500 to -150: {out}")
     return r
 
 
@@ -180,9 +215,12 @@ def audit(obj, never_against, now=None):
     br = Report("board")
     for i, l in enumerate(board):
         check_leg(br, l, f"board {i + 1}", never_against, now)
-        if l.get("modelProb") is not None and l.get("odds"):
-            if l["modelProb"] * dec(l["odds"]) - 1 <= 0:
+        bd = safe_dec(l.get("odds"))
+        if l.get("modelProb") is not None and bd:
+            if l["modelProb"] * bd - 1 <= 0:
                 br.fail("board-value", f"board {i + 1}: no positive value, shouldn't be listed")
+            if l["modelProb"] < BOARD["min_prob"] - EPS:
+                br.fail("board-prob", f"board {i + 1}: under 50% to win")
     if board:
         reports.append(br)
     # The same pick on several tickets stacks risk on one outcome.
@@ -206,6 +244,9 @@ def main(argv=None):
     a = ap.parse_args(argv)
     settings = json.load(open(a.settings)) if a.settings else {}
     settings = settings.get("data", settings)
+    if not isinstance(settings.get("neverAgainst"), list):
+        print("[FAIL] settings: no `neverAgainst` list, so the loyalty rule can't be checked (pass --settings)")
+        return 1
     now = datetime.fromisoformat(a.now.replace("Z", "+00:00")) if a.now else datetime.now(timezone.utc)
     reports = audit(json.load(open(a.tickets)), settings.get("neverAgainst", []), now)
     if a.json:

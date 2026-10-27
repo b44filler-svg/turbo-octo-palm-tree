@@ -44,19 +44,31 @@ def stat_prob(hit_rates):
     return num / den, games
 
 
+LABELS = (("last10", "last 10"), ("last5", "last 5"), ("season", "season"), ("lastSeason", "last season"))
+
+
+def hit_rate_text(hit_rates):
+    """{"last10":[7,10], ...} -> "7/10 last 10, 3/4 season" for the app."""
+    parts = [f"{hit_rates[k][0]}/{hit_rates[k][1]} {lab}" for k, lab in LABELS
+             if (hit_rates or {}).get(k) and hit_rates[k][1]]
+    return ", ".join(parts) or None
+
+
 def fair_of(c):
-    if c.get("sharpOdds"):
+    """(fair probability, flagged-as-thin). Needs both sides of a market."""
+    if len(c.get("sharpOdds") or []) >= 2:
         return om.fair_prob(c["sharpOdds"]), False
     if c.get("fairProb") is not None:
-        return float(c["fairProb"]), bool(c.get("fairFlag"))
+        # A hand-made fair estimate only counts as sharp if it names its source.
+        return float(c["fairProb"]), bool(c.get("fairFlag", not c.get("sharpSource")))
     # No sharp price at all: fall back to FanDuel's own two sides if given.
-    if c.get("bookOdds"):
+    if len(c.get("bookOdds") or []) >= 2:
         return om.fair_prob(c["bookOdds"]), True
     return None, True
 
 
 def bias_adjust(c):
-    t = c.get("type", "")
+    t = str(c.get("type", "")).lower()
     if t == "prop under":
         return 0.015
     if t == "prop over" and c.get("star"):
@@ -94,6 +106,7 @@ def score(c, shrink=0.5):
         p = max(fair - MAX_DEVIATION, min(fair + MAX_DEVIATION, p))
     p = max(FLOOR, min(CAP, p))
 
+    p = round(p, 3)   # every stored number is derived from the stored modelProb
     dec = om.am_to_dec(odds)
     leg.update({
         "odds": odds,
@@ -107,4 +120,6 @@ def score(c, shrink=0.5):
         "growth": round(om.growth(p, dec), 5),
         "result": c.get("result", "open"),
     })
+    if c.get("hitRates") and not c.get("hitRate"):
+        leg["hitRate"] = hit_rate_text(c["hitRates"])
     return leg
