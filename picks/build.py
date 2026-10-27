@@ -39,6 +39,16 @@ PARLAY = dict(min_payout10=18.0, min_ev=0.0, min_leg_edge=0.0, soft_leg_edge=-0.
 BOARD = dict(min_prob=0.50, min_ev=0.0, count=10, sweet_prob=0.55, sweet_dec=1.8)
 BOOST = dict(min_joint=0.25, max_legs=4, min_leg_edge=-0.01, pool=25)
 
+# Leans: used only when a bet type has nothing that clears its full bar, so the
+# app is never empty. Still positive value, but a lower bar, and labeled as such.
+LEAN_BIG = dict(min_prob=0.55, min_edge=0.005, min_ev=0.005, min_odds=-400, max_odds=200, allow_thin=True)
+LEAN_PAIR = dict(min_leg_prob=0.55, min_leg_edge=-0.005, min_joint=0.35,
+                 min_dec=1.7, max_dec=4.0, min_ev=0.005, count=1)
+LEAN_PARLAY = dict(min_payout10=15.0, min_ev=0.0, min_leg_edge=-0.005, soft_leg_edge=-0.015,
+                   min_odds=-600, max_odds=150)
+# Payout plays: plus-money singles with real value, for a bigger payout.
+LONGSHOT = dict(min_prob=0.35, min_ev=0.03, min_odds=120, count=5)
+
 
 def joint(legs):
     p = math.prod(l["modelProb"] for l in legs)
@@ -173,11 +183,11 @@ def build_board(legs):
     return out
 
 
-def build_big(legs, date):
+def build_big(legs, date, cfg=BIG):
     c = [l for l in legs
-         if l["modelProb"] >= BIG["min_prob"] and l["edge"] >= BIG["min_edge"]
-         and l["ev"] >= BIG["min_ev"] and BIG["min_odds"] <= l["odds"] <= BIG["max_odds"]
-         and not l.get("fairFlag")]
+         if l["modelProb"] >= cfg["min_prob"] and l["edge"] >= cfg["min_edge"]
+         and l["ev"] >= cfg["min_ev"] and cfg["min_odds"] <= l["odds"] <= cfg["max_odds"]
+         and (cfg.get("allow_thin") or not l.get("fairFlag"))]
     if not c:
         return None
     best = max(c, key=lambda l: l["growth"])
@@ -185,18 +195,18 @@ def build_big(legs, date):
     return ticket("big", [best], date, kellyFull=round(om.kelly(best["modelProb"], dec), 4))
 
 
-def build_pairs(by_book, date, exclude=()):
+def build_pairs(by_book, date, exclude=(), cfg=PAIR):
     found = []
     for legs in by_book.values():
-        pool = [l for l in legs if l["modelProb"] >= PAIR["min_leg_prob"]
-                and l["edge"] >= PAIR["min_leg_edge"] and l.get("pick") not in exclude]
+        pool = [l for l in legs if l["modelProb"] >= cfg["min_leg_prob"]
+                and l["edge"] >= cfg["min_leg_edge"] and l.get("pick") not in exclude]
         for a, b in itertools.combinations(pool, 2):
             if not combo_ok([a, b]):
                 continue
             t = ticket("pair", [a, b], date)
             dec = t["payout10"] / 10
-            if (t["winChance"] >= PAIR["min_joint"] and PAIR["min_dec"] <= dec <= PAIR["max_dec"]
-                    and t["ev"] >= PAIR["min_ev"]):
+            if (t["winChance"] >= cfg["min_joint"] and cfg["min_dec"] <= dec <= cfg["max_dec"]
+                    and t["ev"] >= cfg["min_ev"]):
                 found.append(t)
     found.sort(key=lambda t: (t["growth"], diff_games(t)), reverse=True)
     out, used = [], set()
@@ -206,7 +216,7 @@ def build_pairs(by_book, date, exclude=()):
             continue
         out.append(t)
         used |= picks
-        if len(out) == PAIR["count"]:
+        if len(out) == cfg["count"]:
             break
     return out
 
@@ -215,17 +225,17 @@ def diff_games(t):
     return len({rules.game_key(l["game"]) for l in t["legs"]})
 
 
-def build_parlay(legs, date, sport):
-    pool = [l for l in legs if str(l["sport"]).upper() == sport and l["edge"] >= PARLAY["soft_leg_edge"]
-            and PARLAY["min_odds"] <= l["odds"] <= PARLAY["max_odds"]]
+def build_parlay(legs, date, sport, cfg=PARLAY):
+    pool = [l for l in legs if str(l["sport"]).upper() == sport and l["edge"] >= cfg["soft_leg_edge"]
+            and cfg["min_odds"] <= l["odds"] <= cfg["max_odds"]]
     found = []
     for combo in itertools.combinations(pool, 3):
-        if sum(1 for l in combo if l["edge"] < PARLAY["min_leg_edge"]) > 1:
+        if sum(1 for l in combo if l["edge"] < cfg["min_leg_edge"]) > 1:
             continue
         if not combo_ok(list(combo)):
             continue
         t = ticket("parlay3", list(combo), date, sport=sport)
-        if t["payout10"] >= PARLAY["min_payout10"] and t["ev"] >= PARLAY["min_ev"]:
+        if t["payout10"] >= cfg["min_payout10"] and t["ev"] >= cfg["min_ev"]:
             found.append(t)
     if not found:
         return None, []
@@ -242,7 +252,7 @@ def build_parlay(legs, date, sport):
             if not combo_ok(legs3):
                 return False
             t = ticket("parlay3", legs3, date, sport=sport)
-            if t["payout10"] < PARLAY["min_payout10"] or t["ev"] < PARLAY["min_ev"]:
+            if t["payout10"] < cfg["min_payout10"] or t["ev"] < cfg["min_ev"]:
                 return False
         return True
 
@@ -250,6 +260,20 @@ def build_parlay(legs, date, sport):
     if backups:
         best["backup"] = max(backups, key=lambda l: l["modelProb"])
     return best, found[:5]
+
+
+def lean(t):
+    """Mark a ticket that only cleared the lower 'lean' bar."""
+    if t:
+        t["tier"] = "lean"
+    return t
+
+
+def build_longshots(legs):
+    """Plus-money singles with real value: lower win chance, bigger payout."""
+    c = [l for l in legs if l["odds"] >= LONGSHOT["min_odds"] and l["modelProb"] >= LONGSHOT["min_prob"]
+         and l["ev"] >= LONGSHOT["min_ev"]]
+    return sorted(c, key=lambda l: l["growth"], reverse=True)[:LONGSHOT["count"]]
 
 
 def build_boosts(by_book, boosts, date):
@@ -299,11 +323,16 @@ def build_all(candidates, date, settings=None, stats=None, boosts_in=None):
     books = settings.get("books") or []
     legs, by_book, dropped = prepare(candidates, shrink, settings["neverAgainst"], books)
     board = build_board(legs)
-    big = build_big(legs, date)
+    big = build_big(legs, date) or lean(build_big(legs, date, LEAN_BIG))
     pairs = build_pairs(by_book, date, exclude={big["legs"][0]["pick"]} if big else ())
+    if not pairs:
+        pairs = [lean(t) for t in build_pairs(by_book, date, {big["legs"][0]["pick"]} if big else (), LEAN_PAIR)]
     parlays, top5 = {}, {}
     for sport in sorted({str(l["sport"]).upper() for l in legs}):
         options = [r for r in (build_parlay(bl, date, sport) for bl in by_book.values()) if r[0]]
+        if not options:
+            options = [(lean(r[0]), r[1]) for r in
+                       (build_parlay(bl, date, sport, LEAN_PARLAY) for bl in by_book.values()) if r[0]]
         if options:
             # Closest to a lock first; between books within 2 points, the bigger payout.
             top = max(o[0]["winChance"] for o in options)
@@ -316,7 +345,7 @@ def build_all(candidates, date, settings=None, stats=None, boosts_in=None):
         "date": date, "shrink": shrink, "candidates": len(candidates), "books": books,
         "dropped": [{"pick": l.get("pick"), "why": why} for l, why in dropped],
         "board": board, "big": big, "pairs": pairs, "parlays": parlays, "top5": top5,
-        "boosts": boosts,
+        "boosts": boosts, "longshots": build_longshots(legs),
     }
 
 

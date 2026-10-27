@@ -18,6 +18,8 @@ if (built.big) add(`${today}-big`, built.big, { audit: { status: "PASS", note: "
 (built.pairs || []).forEach((p, i) => add(`${today}-pair-${i + 1}`, p, { audit: { status: "WARN", note: "one price from Covers" } }));
 Object.entries(built.parlays || {}).forEach(([s, p]) => add(`${today}-${s.toLowerCase()}`, p));
 (built.boosts || []).forEach((p, i) => add(`${today}-boost-${i + 1}`, p));
+// A lean ticket (only cleared the lower bar) must be labeled as one.
+if (built.pairs && built.pairs[0]) add(`${today}-pair-9`, { ...built.pairs[0], tier: "lean" });
 // A graded, placed ticket from an earlier day for the Profit, Calendar and History tabs.
 const old = JSON.parse(fs.readFileSync(path.join(__dirname, "fixtures", "ticket_2026-10-26-nfl.json"), "utf8"));
 parlays["2026-10-20-nfl"] = { ...old, date: "2026-10-20", createdAt: "2026-10-20T15:00:00Z", result: "won", placed: true, stake: 20 };
@@ -42,7 +44,8 @@ const games = {};
     sources: [{ title: "Covers matchup", url: "https://www.covers.com/" }],
   };
 });
-const board = { [today]: { date: today, createdAt: stamp, items: built.board, note: "Ranked by quarter-Kelly growth." } };
+const longshots = built.board.slice(0, 2).map(l => ({ ...l, odds: 150 }));
+const board = { [today]: { date: today, createdAt: stamp, items: built.board, longshots, note: "Ranked by quarter-Kelly growth." } };
 const settings = { main: { defaultStake: 10, monthlyBudget: 200, neverAgainst: ["Philadelphia Eagles"] } };
 const model = { stats: { legsGraded: 12, legsHit: 9, avgClv: 0.012, beatCloseRate: 0.58, shrink: 0.5, auditFixes: 3, lesson: "Unders are hitting." } };
 const changelog = { [today]: { at: stamp, title: "Revamp", detail: "New bet types.", kind: "feature" } };
@@ -100,12 +103,17 @@ function mock(DATA) {
       parlay: document.querySelectorAll(".ticket.k-parlay3").length, board: document.querySelectorAll(".board li").length,
       sizing: document.querySelector(".sizing")?.textContent || "", audit: document.querySelectorAll(".audit").length,
       glance: document.querySelectorAll(".glance li").length,
+      slate: document.querySelectorAll("#s-slate li").length,
+      lean: document.querySelectorAll(".tag.lean").length,
+      payout: !!document.getElementById("s-payout"),
+      lastNight: [...document.querySelectorAll("#todayBox .label")].some(l => /won|waiting/.test(l.textContent)),
       tagBook: [...document.querySelectorAll(".ticket .tag")].some(t => /FanDuel|Courtside/.test(t.textContent)),
       feed: document.querySelectorAll(".feed li").length, gtime: document.querySelector(".glance .gtime")?.textContent || "",
     }));
     if (counts.big !== 1 || counts.pair < 1 || counts.parlay < 1 || counts.board < 1) fail(`${width}px Today counts ${JSON.stringify(counts)}`);
     if (counts.feed !== 2 || !/Updated .* ET/.test(counts.gtime)) fail(`${width}px updates feed ${counts.feed}, time line "${counts.gtime}"`);
     if (!counts.tagBook) fail(`${width}px tickets don't show their sportsbook`);
+    if (counts.slate < 2 || counts.lean < 1 || !counts.payout || !counts.lastNight) fail(`${width}px slate/lean/payout/last night: ${JSON.stringify(counts)}`);
     if (counts.glance < 4) fail(`${width}px glance card has ${counts.glance} rows`);
     if (!/up to \$\d+|sit this one out/.test(counts.sizing)) fail(`${width}px Big Bet size guide missing: ${counts.sizing}`);
     await overflow("today");
@@ -152,6 +160,31 @@ function mock(DATA) {
     await overflow("history detail");
     if (errors.length) fail(`${width}px console errors: ${errors.join(" | ")}`);
     console.log(`${width}px ${scheme}: checked`);
+    await ctx.close();
+  }
+  // Before today's picks post, Today must still show something: the slate and last night.
+  {
+    const EMPTY = JSON.parse(JSON.stringify(DATA));
+    Object.keys(EMPTY.parlays).filter(id => id.startsWith(today)).forEach(id => delete EMPTY.parlays[id]);
+    EMPTY.board = {};
+    const ctx = await browser.newContext({ viewport: { width: 400, height: 900 } });
+    const page = await ctx.newPage();
+    const errors = [];
+    page.on("pageerror", e => errors.push(e.message));
+    await page.route("https://fonts.googleapis.com/**", r => r.fulfill({ body: "", contentType: "text/css" }));
+    await page.addInitScript(mock, EMPTY);
+    await page.route("https://app.test/", r => r.fulfill({ body: html, contentType: "text/html" }));
+    await page.goto("https://app.test/");
+    await page.waitForTimeout(300);
+    const e = await page.evaluate(() => ({
+      note: document.querySelector("#todayBox .note")?.textContent || "",
+      slate: document.querySelectorAll("#s-slate li").length,
+      panels: document.querySelectorAll("#todayBox .panel").length,
+    }));
+    if (!e.note || e.slate < 2 || e.panels < 2) fail(`empty morning view: ${JSON.stringify(e)}`);
+    if (errors.length) fail(`empty morning view errors: ${errors.join(" | ")}`);
+    if (process.env.SHOTS) await page.screenshot({ path: path.join(process.env.SHOTS, "empty-400.png"), fullPage: true });
+    console.log("400px before picks: checked");
     await ctx.close();
   }
   await browser.close();

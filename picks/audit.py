@@ -27,6 +27,11 @@ PAIR = dict(min_leg_prob=0.60, min_joint=0.42, min_dec=1.9, max_dec=3.6, min_ev=
 PARLAY = dict(min_payout10=18.0, min_ev=0.0, min_odds=-500, max_odds=-150)
 BOARD = dict(min_prob=0.50)
 BOOST_MIN_JOINT = 0.25
+# The lower "lean" bar, used only when nothing clears the full one (still positive value).
+LEAN_BIG = dict(min_prob=0.55, min_edge=0.005, min_ev=0.005, min_odds=-400, max_odds=200)
+LEAN_PAIR = dict(min_leg_prob=0.55, min_joint=0.35, min_dec=1.7, max_dec=4.0, min_ev=0.005)
+LEAN_PARLAY = dict(min_payout10=15.0, min_ev=0.0, min_odds=-600, max_odds=150, min_leg_edge=-0.005)
+LONGSHOT = dict(min_prob=0.35, min_ev=0.03, min_odds=120)
 LEGS_BY_KIND = {"big": 1, "pair": 2, "parlay3": 3}
 BOOST_LEGS = (1, 4)   # a boost ticket may have 1 to 4 legs
 REQUIRED = ("sport", "game", "pick", "market", "type", "odds", "modelProb", "source")
@@ -181,35 +186,39 @@ def check_ticket(tid, t, never_against, now=None, books=None):
             r.fail("ev-math", f"ev {t['ev']} but winChance x payout - 1 = {e:+.3f}")
         if legacy:
             return r
+        lean = t.get("tier") == "lean"
+        if t.get("tier") not in (None, "lean"):
+            r.fail("bad-tier", f"unknown tier {t.get('tier')!r}")
+        big_c, pair_c, parlay_c = (LEAN_BIG, LEAN_PAIR, LEAN_PARLAY) if lean else (BIG, PAIR, PARLAY)
         if kind == "big":
             l, o = legs[0], float(legs[0]["odds"])
-            if l["modelProb"] < BIG["min_prob"] - EPS or l["modelProb"] - 1 / d < BIG["min_edge"] - EPS:
-                r.fail("big-threshold", f"Big Bet needs win >= 60% and edge >= 2.5 pts (has {l['modelProb']:.0%}, {l['modelProb'] - 1 / d:+.3f})")
-            if e < BIG["min_ev"] - EPS:
-                r.fail("big-value", f"Big Bet model value {e:+.1%} is under +3%")
-            if not BIG["min_odds"] <= o <= BIG["max_odds"]:
-                r.fail("big-odds", f"Big Bet price {sgn(o)} is outside -300 to +150")
-            if l.get("fairFlag"):
+            if l["modelProb"] < big_c["min_prob"] - EPS or l["modelProb"] - 1 / d < big_c["min_edge"] - EPS:
+                r.fail("big-threshold", f"Big Bet needs win >= {big_c['min_prob']:.0%} and edge >= {big_c['min_edge']*100:.1f} pts (has {l['modelProb']:.0%}, {l['modelProb'] - 1 / d:+.3f})")
+            if e < big_c["min_ev"] - EPS:
+                r.fail("big-value", f"Big Bet model value {e:+.1%} is under {big_c['min_ev']:+.1%}")
+            if not big_c["min_odds"] <= o <= big_c["max_odds"]:
+                r.fail("big-odds", f"Big Bet price {sgn(o)} is outside {big_c['min_odds']} to +{big_c['max_odds']}")
+            if l.get("fairFlag") and not lean:
                 r.fail("big-thin", "Big Bet can't rest on a thin fair price")
         if kind == "pair":
-            if not (PAIR["min_dec"] - 0.005 <= d <= PAIR["max_dec"] + 0.005 and win >= PAIR["min_joint"] - EPS):
-                r.fail("pair-threshold", f"Power Pair needs 1.9x-3.6x payout and 42%+ win (has {d:.2f}x, {win:.0%})")
-            if e < PAIR["min_ev"] - EPS:
-                r.fail("pair-value", f"Power Pair model value {e:+.1%} is under +2%")
-            weak = [l["pick"] for l in legs if l["modelProb"] < PAIR["min_leg_prob"] - EPS]
+            if not (pair_c["min_dec"] - 0.005 <= d <= pair_c["max_dec"] + 0.005 and win >= pair_c["min_joint"] - EPS):
+                r.fail("pair-threshold", f"Power Pair needs {pair_c['min_dec']}x-{pair_c['max_dec']}x payout and {pair_c['min_joint']:.0%}+ win (has {d:.2f}x, {win:.0%})")
+            if e < pair_c["min_ev"] - EPS:
+                r.fail("pair-value", f"Power Pair model value {e:+.1%} is under {pair_c['min_ev']:+.1%}")
+            weak = [l["pick"] for l in legs if l["modelProb"] < pair_c["min_leg_prob"] - EPS]
             if weak:
-                r.fail("pair-leg", f"Power Pair legs must each be 60%+: {weak}")
+                r.fail("pair-leg", f"Power Pair legs must each be {pair_c['min_leg_prob']:.0%}+: {weak}")
         if kind == "parlay3":
-            if 10 * d < PARLAY["min_payout10"] - TOL_PAY:
-                r.fail("parlay-payout", f"$10 pays {10 * d:.2f}, under the $18 floor")
-            if e < PARLAY["min_ev"] - EPS:
+            if 10 * d < parlay_c["min_payout10"] - TOL_PAY:
+                r.fail("parlay-payout", f"$10 pays {10 * d:.2f}, under the ${parlay_c['min_payout10']:.0f} floor")
+            if e < parlay_c["min_ev"] - EPS:
                 r.fail("parlay-value", f"negative model value {e:+.1%}")
-            neg = sum(1 for l in legs if l["modelProb"] - 1 / dec(l["odds"]) < -EPS)
+            neg = sum(1 for l in legs if l["modelProb"] - 1 / dec(l["odds"]) < parlay_c.get("min_leg_edge", 0) - EPS)
             if neg > 1:
                 r.fail("filler-legs", f"{neg} legs with negative edge (max 1)")
-            out = [sgn(l["odds"]) for l in legs if not PARLAY["min_odds"] <= float(l["odds"]) <= PARLAY["max_odds"]]
+            out = [sgn(l["odds"]) for l in legs if not parlay_c["min_odds"] <= float(l["odds"]) <= parlay_c["max_odds"]]
             if out:
-                r.fail("parlay-odds", f"3-leg parlay legs must be -500 to -150: {out}")
+                r.fail("parlay-odds", f"3-leg parlay legs must be {parlay_c['min_odds']} to {parlay_c['max_odds']}: {out}")
         if kind == "boost":
             if e <= 0:
                 r.fail("boost-value", f"even with the boost, model value is {e:+.1%}")
@@ -250,6 +259,16 @@ def audit(obj, never_against, now=None, books=None):
                 br.fail("board-prob", f"board {i + 1}: under 50% to win")
     if board:
         reports.append(br)
+    lr = Report("longshots")
+    for i, l in enumerate(obj.get("longshots") or [] if isinstance(obj, dict) else []):
+        check_leg(lr, l, f"payout play {i + 1}", never_against, now, books=books)
+        ld = safe_dec(l.get("odds"))
+        if ld and l.get("modelProb") is not None:
+            if l["odds"] < LONGSHOT["min_odds"] or l["modelProb"] < LONGSHOT["min_prob"] - EPS \
+                    or l["modelProb"] * ld - 1 < LONGSHOT["min_ev"] - EPS:
+                lr.fail("longshot-bar", f"payout play {i + 1} needs +120 or longer, 35%+ to win and +3% value")
+    if lr.items:
+        reports.append(lr)
     # The same pick on several tickets stacks risk on one outcome.
     seen = {}
     for tid, t in tickets.items():

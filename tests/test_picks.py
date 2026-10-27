@@ -431,3 +431,68 @@ def test_audit_catches_unboosted_payout_on_boost():
 def test_boost_at_a_book_with_no_legs_gives_nothing():
     res = build.build_all(multibook(), "2026-10-27", BOOKS, None, [{**BOOST, "book": "Caesars"}])
     assert res["boosts"] == []
+
+
+# ---------- leans and payout plays (the app is never empty) ----------
+
+def thin_day():
+    """Small edges only: nothing clears the full bar, but some bets have positive value."""
+    base = {"sport": "NBA", "market": "Points", "type": "prop under", "source": "FanDuel Sportsbook",
+            "sharpSource": "consensus"}
+    games = ["Bulls @ Heat", "Jazz @ Nuggets", "Celtics @ Knicks", "Lakers @ Suns"]
+    out = []
+    for i, g in enumerate(games):
+        home = g.split(" @ ")[1]
+        out.append({**base, "game": g, "team": home, "player": f"P{i}", "pick": f"P{i} under",
+                    "odds": -150, "sharpOdds": [-165, 140]})
+        out.append({**base, "game": g, "type": "moneyline", "market": "Moneyline", "team": home,
+                    "pick": f"{home} ML", "odds": -260, "sharpOdds": [-280, 230]})
+    return out
+
+
+def test_thin_day_still_posts_leans():
+    res = build.build_all(thin_day(), "2026-10-27", {"neverAgainst": EAGLES})
+    strict = build.build_big(build.prepare(thin_day(), 0.5, EAGLES)[0], "d")
+    assert strict is None                                  # nothing clears the full Big Bet bar
+    assert res["big"] and res["big"]["tier"] == "lean" and res["big"]["ev"] > 0
+    tickets = [res["big"], *res["pairs"], *res["parlays"].values()]
+    assert res["pairs"] and res["pairs"][0]["tier"] == "lean"
+    assert all(t["ev"] >= 0 for t in tickets)              # leans are still positive value
+    assert [r.tid for r in audit.audit(res, EAGLES, NOW) if r.status == "FAIL"] == []
+
+
+def test_leans_never_replace_full_picks(built):
+    assert "tier" not in built["big"]
+    assert all("tier" not in t for t in built["pairs"] + list(built["parlays"].values()))
+
+
+def test_lean_is_still_checked():
+    res = build.build_all(thin_day(), "2026-10-27", {"neverAgainst": EAGLES})
+    bad = copy.deepcopy(res)
+    l = bad["big"]["legs"][0]
+    l["modelProb"] = 0.50                                  # below even the lean bar
+    l["edge"] = round(0.50 - l["impliedProb"], 3)
+    bad["big"]["winChance"] = 0.5
+    bad["big"]["ev"] = round(0.5 * audit.dec(l["odds"]) - 1, 3)
+    assert "big-threshold" in codes(audit.audit(bad, EAGLES, NOW))
+
+
+def test_payout_plays():
+    c = load("candidates.json") + [
+        {"sport": "NBA", "game": "Warriors @ Kings", "pick": "Kings ML", "market": "Moneyline",
+         "type": "moneyline", "team": "Sacramento Kings", "odds": 150, "sharpOdds": [125, -145],
+         "source": "FanDuel Sportsbook", "sharpSource": "Pinnacle", "adjust": 0.03}]
+    res = build.build_all(c, "2026-10-27", {"neverAgainst": EAGLES})
+    assert res["longshots"] and all(l["odds"] >= 120 and l["ev"] >= 0.03 for l in res["longshots"])
+    assert [r.tid for r in audit.audit(res, EAGLES, NOW) if r.status == "FAIL"] == []
+
+
+def test_lean_bars_match_builder():
+    for name in ("min_prob", "min_edge", "min_ev", "min_odds", "max_odds"):
+        assert audit.LEAN_BIG[name] == build.LEAN_BIG[name]
+    for name in audit.LEAN_PAIR:
+        assert audit.LEAN_PAIR[name] == build.LEAN_PAIR[name]
+    for name in audit.LEAN_PARLAY:
+        assert audit.LEAN_PARLAY[name] == build.LEAN_PARLAY[name]
+    for name in audit.LONGSHOT:
+        assert audit.LONGSHOT[name] == build.LONGSHOT[name]

@@ -201,6 +201,14 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 .t-more>p{margin:6px 0;font-size:.88rem;color:var(--muted)}
 .t-more .backup,.t-more .audit,.t-more .watch,.t-more .srcs{padding:6px 0;border:0}
 
+/* leans, slate */
+.tag.lean{border-color:var(--accent);color:var(--accent)}
+.lean-note{margin:0;padding:10px 18px;border-top:1px solid var(--line);font-size:.86rem;color:var(--accent)}
+.slate .slate-row{all:unset;box-sizing:border-box;cursor:pointer;width:100%;display:grid;grid-template-columns:34px minmax(0,1fr) auto;gap:2px 10px;padding:11px 0;align-items:start}
+.slate .slate-row:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.slate .sp{font:700 .7rem/1.6 var(--mono);letter-spacing:.06em;color:var(--accent)}
+.slate-lean{font-size:.84rem;color:var(--accent);margin-top:3px}
+
 /* updates feed */
 .glance .gtime{display:block;font:500 .78rem var(--mono);letter-spacing:.04em;text-transform:none;color:var(--muted);margin-top:6px}
 .feed{background:var(--paper);border:1px solid var(--line);border-radius:6px;padding:14px 18px}
@@ -444,6 +452,7 @@ const kindOf = p => KIND_LABEL[p.kind] ? p.kind : (p.legs||[]).length===1 ? "big
 // A boost caps the stake it applies to; never offer more than that.
 const stakesFor = p => { const s = STAKES_BY_KIND[kindOf(p)], cap = Number(p.boost?.maxStake); return cap ? (s.filter(x=>x<=cap).length ? s.filter(x=>x<=cap) : [cap]) : s; };
 function defaultStakeFor(p){
+  if(p.tier==="lean") return stakesFor(p)[0];   // leans start at the smallest size
   if(kindOf(p)!=="big") return Number(settings.defaultStake) || 10;
   // Big Bet: the largest size at or under the size guide, else $25 when no budget is set.
   const g = bigGuide(p), opts = stakesFor(p);
@@ -548,11 +557,12 @@ function ticket(p){
   const art = el("article","ticket k-" + kind);
   const head = el("div","t-head");
   const hl = el("div"); hl.append(el("h2",null,p.title || KIND_LABEL[kind]), el("p",null,[prettyDate(p.date), p.firstStart].filter(Boolean).join(" · ")));
-  const bookTxt = p.book ? " · " + p.book : "";
+  const bookTxt = (p.book ? " · " + p.book : "") ;
+  const leanTxt = p.tier==="lean" ? "Lean · " : "";
   const tagText = kind==="big" ? "Big Bet · " + fmtAm(Number((p.legs||[])[0]?.odds)) + bookTxt
     : kind==="boost" ? Math.round(Number(p.boost?.pct||0)*100) + "% boost · " + fmtAm(Number(p.parlayOdds)||toAm(dec)) + bookTxt
     : KIND_LABEL[kind] + " · " + fmtAm(Number(p.parlayOdds)||toAm(dec)) + bookTxt;
-  head.append(hl, el("span","tag " + res, res==="open" ? tagText : res==="won" ? "Won" : res==="lost" ? "Lost" : "Void · refunded"));
+  head.append(hl, el("span","tag " + res + (p.tier==="lean" && res==="open" ? " lean" : ""), res==="open" ? leanTxt + tagText : res==="won" ? "Won" : res==="lost" ? "Lost" : "Void · refunded"));
   art.append(head);
   if(p.lateCheck && p.lateCheck.status && res==="open"){
     const s = String(p.lateCheck.status);
@@ -584,6 +594,7 @@ function ticket(p){
     ul.append(li);
   });
   art.append(ul);
+  if(p.tier==="lean" && res==="open") art.append(el("p","lean-note","Lean: positive value, but it didn't clear the full bar for this bet type. Treat it as a smaller play."));
   if(p.summary) art.append(el("p","script",p.summary));
   if(p.audit && p.audit.status){
     const a = el("p","audit"), ok = p.audit.status==="PASS";
@@ -666,12 +677,12 @@ function sizingNote(p){
 }
 
 /* ---------- best bets board ---------- */
-function renderBoard(box, b){
+function renderBoard(box, b, label, intro){
   const items = (b.items||[]);
   if(!items.length) return;
   const panel = el("div","panel");
-  panel.append(el("p","label","Best Bets board · win chance and payout together"));
-  panel.append(el("p","status","Every single with positive model value today, ranked by how much each grows a bankroll over time. That score rewards a high win chance and a big payout at once, so a +150 with a real edge can rank next to a −200 favorite. ★ Sweet spot = 55%+ to win and pays at least $18 on $10."));
+  panel.append(el("p","label",label || "Best Bets board · win chance and payout together"));
+  panel.append(el("p","status",intro || "Every single with positive model value today, ranked by how much each grows a bankroll over time. That score rewards a high win chance and a big payout at once, so a +150 with a real edge can rank next to a −200 favorite. ★ Sweet spot = 55%+ to win and pays at least $18 on $10."));
   const ul = el("ul","board"); ul.style.marginTop = "8px";
   items.forEach((l,i)=>{
     const li = el("li"), d = el("details"), sm = el("summary"), r = l.result || "open";
@@ -737,9 +748,9 @@ function renderFeed(){
 }
 
 /* ---------- TODAY: at a glance ---------- */
-function renderGlance(list, board){
+function renderGlance(list, board, longshots){
   const box = $("glance"); box.replaceChildren();
-  if(!list.length && !board) return;
+  if(!list.length && !board && !(longshots||[]).length) return;
   const card = el("section","glance"); card.setAttribute("aria-label","Today at a glance");
   const h = el("h2",null,"Today at a glance");
   h.append(el("span","gtime", freshness()));
@@ -758,11 +769,13 @@ function renderGlance(list, board){
     const win = p.winChance ? Math.round(p.winChance*100) + "% to win" : "";
     const pays = "$10 pays " + money(10*dec);
     const status = p.result && p.result!=="open" ? (p.result==="won"?"✓ Won":p.result==="lost"?"✕ Lost":"Void") : p.lateCheck?.status==="skip today" ? "Skip today" : p.lateCheck?.status==="swap a leg" ? "Swap a leg" : "";
-    const label = (k==="big" ? "Big Bet · best for a bigger stake" : k==="pair" ? "Power Pair · 2 legs" : sportOf(p) + " parlay · 3 legs") + (p.book ? " · at " + p.book : "");
+    const label = (p.tier==="lean" ? "Lean · " : "") + (k==="big" ? (p.tier==="lean" ? "Best single" : "Big Bet · best for a bigger stake") : k==="pair" ? "Power Pair · 2 legs" : sportOf(p) + " parlay · 3 legs") + (p.book ? " · at " + p.book : "");
     row(label, legsText(p), fmtAm(k==="big" ? Number(p.legs?.[0]?.odds) : Number(p.parlayOdds)||toAm(dec)), [win, pays, status, p.placed ? "You bet $" + stakeOf(p) : ""].filter(Boolean).join(" · "), "s-" + sectionOf(p));
   });
   const nb = docs.filter(d => dkey(d) === todayET() && kindOf(d) === "boost").length;
   if(nb){ const li = el("li"), bt = el("button"); bt.type = "button"; bt.append(el("span","gk","FanDuel boosts"), el("span","gp", nb + " boosted bet" + (nb>1?"s":"") + " picked for today's promos"), el("span","gv","→")); bt.onclick = ()=>show("boosts"); li.append(bt); ul.append(li); }
+  const ls = (longshots||[])[0];
+  if(ls) row("Top payout play" + (ls.book ? " · at " + ls.book : ""), ls.pick, fmtAm(Number(ls.odds)), [has(ls.modelProb) ? pc(ls.modelProb) + " to win" : "", "$10 pays " + money(10*toDec(Number(ls.odds)))].filter(Boolean).join(" · "), "s-payout");
   const top = board && (board.items||[])[0];
   if(top) row("Top single bet" + (top.sweetSpot ? " · ★ sweet spot" : ""), top.pick, fmtAm(Number(top.odds)), [has(top.modelProb) ? pc(top.modelProb) + " to win" : "", "$10 pays " + money(10*toDec(Number(top.odds)))].filter(Boolean).join(" · "), "s-board");
   card.append(ul);
@@ -783,12 +796,14 @@ function renderToday(){
   const mine = docs.filter(d => dkey(d) === t && /placed$/.test(d._id));
   const found = boards.find(b => dkey(b) === t);
   const board = found && (found.items||[]).length ? found : null;
+  const longshots = (found && found.longshots) || [];
   const b0 = budgetInfo();
   if(b0 && b0.left <= 0){ const w = el("p","note"); w.append(el("b",null,"You're at your monthly budget. "), "Your plan says sit these out until next month."); box.append(w); }
   const list = [...todays].sort((a,b)=>SECTION_ORDER.indexOf(sectionOf(a)) - SECTION_ORDER.indexOf(sectionOf(b)) || String(a._id).localeCompare(String(b._id)));
-  renderGlance(list, board);
+  renderGlance(list, board, longshots);
   renderFeed();
-  if(list.length || board){
+  const rs = found && found.runStatus;
+  if(list.length || board || longshots.length){
     let last = null;
     list.forEach(p=>{
       const s = sectionOf(p);
@@ -800,20 +815,64 @@ function renderToday(){
       box.append(ticket(p));
     });
     mine.forEach(p=>box.append(ticket(p)));
+    if(longshots.length){ const h = el("p","sport-head","Payout plays"); h.id = "s-payout"; h.append(el("small",null,"Plus-money bets with real value. Lower win chance, bigger payout: keep the stake small.")); box.append(h); renderBoard(box, {date:t, items:longshots, note:""}, "Payout plays · +120 or longer", "Ranked the same way as the board. These win less than half the time, so expect losing days."); }
     if(board){ const h = el("p","sport-head","Best Bets board"); h.id = "s-board"; box.append(h); renderBoard(box, board); }
-    const rs = found && found.runStatus;
     if(rs && rs.reason){ const r = el("p","note"); r.append(el("b",null,"About today's run: "), String(rs.reason)); box.append(r); }
-    return;
+  } else {
+    const n = el("p","note");
+    const hourET = Number(new Intl.DateTimeFormat("en-US",{timeZone:tz,hour:"numeric",hourCycle:"h23"}).format(new Date()));
+    if(rs && rs.status==="error") n.append(el("b",null,"Today's run hit a problem. "), (rs.reason ? String(rs.reason) + " " : "") + "Tap Research new bets now to try again.");
+    else if(rs) n.append(el("b",null,"No bets today. "), (rs.reason ? String(rs.reason) + " " : "") + "Sitting out a day without a real edge is part of the plan.");
+    else if(hourET >= 10) n.append(el("b",null,"Today's picks haven't posted. "), "The morning run didn't leave any picks or a reason. The 11:43 AM check starts a new run on its own, or tap Research new bets now.");
+    else n.append(el("b",null,"Today's picks aren't up yet. "), "They post by about 8 AM ET. Meanwhile, here's tonight's slate and how last night went.");
+    box.append(n);
+    mine.forEach(p=>box.append(ticket(p)));
   }
-  const n = el("p","note"), rs = found && found.runStatus, recent = docs.length ? " Here's the most recent ticket." : "";
-  const hourET = Number(new Intl.DateTimeFormat("en-US",{timeZone:tz,hour:"numeric",hourCycle:"h23"}).format(new Date()));
-  if(rs && rs.status==="error") n.append(el("b",null,"Today's run hit a problem. "), (rs.reason ? String(rs.reason) + " " : "") + "Tap Research new bets now to try again." + recent);
-  else if(rs) n.append(el("b",null,"No bets today. "), (rs.reason ? String(rs.reason) + " " : "") + "Sitting out a day without a real edge is part of the plan." + recent);
-  else if(hourET >= 10) n.append(el("b",null,"Today's picks haven't posted. "), "The morning run didn't leave any picks or a reason. The 11:43 AM check starts a new run on its own, or tap Research new bets now." + recent);
-  else n.append(el("b",null,docs.length ? "Today's picks aren't up yet. " : "No picks yet. "), "They post by about 8 AM ET, or tap Research new bets now." + recent);
-  box.append(n);
-  if(docs.length) box.append(ticket(docs[0]));
-  mine.forEach(p=>box.append(ticket(p)));
+  renderSlate(box, t);
+  renderLastNight(box, t);
+}
+
+/* Tonight's games at a glance: time, lines, no-vig favorite and the model's lean. Always shown when sheets exist. */
+function renderSlate(box, t){
+  const day = games.filter(g=>dkey(g)===t).sort((a,b)=>String(a.startISO||a.start||"").localeCompare(String(b.startISO||b.start||"")));
+  if(!day.length) return;
+  const panel = el("section","panel slate"); panel.id = "s-slate";
+  panel.append(el("p","label","Tonight's slate · " + day.length + " game" + (day.length>1?"s":"")));
+  const ul = el("ul","board");
+  day.forEach(g=>{
+    const li = el("li"), b = el("button","slate-row"); b.type = "button";
+    const fw = g.fairWin || {}, teams = String(g.game||"").split(/\s+@\s+/);
+    const fav = has(fw.away) && has(fw.home) ? (fw.home >= fw.away ? teams[1] + " " + pc(fw.home) : teams[0] + " " + pc(fw.away)) : "";
+    const mid = el("div"); mid.append(el("div","bp",g.game||"Game"), el("div","bm",[g.start, g.lines?.spread, g.lines?.total].filter(Boolean).join(" · ")));
+    if(g.lean) mid.append(el("div","slate-lean","Lean: " + g.lean));
+    b.append(el("span","sp",g.sport||""), mid, el("span","odds", fav || (g.result||"")));
+    b.onclick = ()=>openGame(g.game, t);
+    li.append(b); ul.append(li);
+  });
+  panel.append(ul);
+  panel.append(el("p","status","Tap a game for injuries, matchup notes, trends and weather. Percent = the favorite's no-vig win chance."));
+  box.append(panel);
+}
+
+/* Last night: every ticket from the previous day with picks, and the record. */
+function renderLastNight(box, t){
+  const prev = [...new Set(docs.map(dkey))].filter(d=>d && d < t).sort().pop();
+  if(!prev) return;
+  const items = docs.filter(p=>dkey(p)===prev);
+  if(!items.length) return;
+  const panel = el("section","panel");
+  const done = items.filter(graded), w = done.filter(p=>p.result==="won").length;
+  panel.append(el("p","label",prettyDate(prev) + " · " + (done.length ? w + " of " + done.length + " won" : "waiting on results")));
+  const ul = el("ul","hist");
+  items.forEach(p=>{
+    const li = el("li"), b = el("button"), r = p.result || "open", n = netOf(p);
+    const left = el("div"); left.append(el("div",null,p.title || KIND_LABEL[kindOf(p)]), el("div","meta",KIND_LABEL[kindOf(p)] + (p.book ? " · " + p.book : "") + " · " + fmtAm(Number(p.parlayOdds)||toAm(decOf(p)))));
+    b.append(left, el("span","r " + (r==="won"?"pos":r==="lost"?"neg":""), p.placed && graded(p) ? signed(n) : r==="won" ? "Won" : r==="lost" ? "Lost" : r==="void" ? "Void" : "Pending"));
+    b.onclick = ()=>{ histSel = p._id; show("history"); renderHistory(); $("histDay").scrollIntoView({behavior:"smooth",block:"start"}); };
+    li.append(b); ul.append(li);
+  });
+  panel.append(ul);
+  box.append(panel);
 }
 
 /* ---------- GAMES ---------- */
