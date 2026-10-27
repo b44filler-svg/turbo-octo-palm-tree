@@ -82,7 +82,8 @@ side **first** in `sharpOdds`. Without a sharp price, give `fairProb` and
 ```bash
 python -m picks.build tests/fixtures/candidates.json --date 2026-10-27 --settings tests/fixtures/settings.json --out draft.json
 python -m picks.audit draft.json --settings tests/fixtures/settings.json
-python -m pytest -q                                 # engine + auditor tests
+python3 -m picks.selftest                           # quick check, no installs (the daily task runs this)
+python -m pytest -q                                 # full engine + auditor tests
 NODE_PATH=$(npm root -g) node tests/page_test.js    # app page in Chromium with a mocked database
 ```
 

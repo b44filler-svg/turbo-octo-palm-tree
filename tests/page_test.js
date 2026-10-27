@@ -45,7 +45,11 @@ const board = { [today]: { date: today, createdAt: stamp, items: built.board, no
 const settings = { main: { defaultStake: 10, monthlyBudget: 200, neverAgainst: ["Philadelphia Eagles"] } };
 const model = { stats: { legsGraded: 12, legsHit: 9, avgClv: 0.012, beatCloseRate: 0.58, shrink: 0.5, auditFixes: 3, lesson: "Unders are hitting." } };
 const changelog = { [today]: { at: stamp, title: "Revamp", detail: "New bet types.", kind: "feature" } };
-const DATA = { parlays, games, board, settings, model, changelog };
+const updates = {
+  [`${today}-0741-picks`]: { at: stamp, date: today, kind: "picks", title: "Today's picks are up", detail: "Big Bet, 2 pairs, NBA and MLB parlays." },
+  [`${today}-1143-check`]: { at: stamp, date: today, kind: "check", title: "11:43 AM check: all clear", detail: "No injury news on any leg." },
+};
+const DATA = { parlays, games, board, settings, model, changelog, updates };
 
 function mock(DATA) {
   const writes = [];
@@ -95,8 +99,10 @@ function mock(DATA) {
       parlay: document.querySelectorAll(".ticket.k-parlay3").length, board: document.querySelectorAll(".board li").length,
       sizing: document.querySelector(".sizing")?.textContent || "", audit: document.querySelectorAll(".audit").length,
       glance: document.querySelectorAll(".glance li").length,
+      feed: document.querySelectorAll(".feed li").length, gtime: document.querySelector(".glance .gtime")?.textContent || "",
     }));
     if (counts.big !== 1 || counts.pair < 1 || counts.parlay < 1 || counts.board < 1) fail(`${width}px Today counts ${JSON.stringify(counts)}`);
+    if (counts.feed !== 2 || !/Updated .* ET/.test(counts.gtime)) fail(`${width}px updates feed ${counts.feed}, time line "${counts.gtime}"`);
     if (counts.glance < 4) fail(`${width}px glance card has ${counts.glance} rows`);
     if (!/up to \$\d+|sit this one out/.test(counts.sizing)) fail(`${width}px Big Bet size guide missing: ${counts.sizing}`);
     await overflow("today");

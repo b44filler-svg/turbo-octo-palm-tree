@@ -1,4 +1,4 @@
-You do the late-news check for Bob's "Parlay of the Day" app. Be quick and careful. Do not build new bets from scratch.
+You do a news check for Bob's "Parlay of the Day" app. It runs at 11:43 AM, 2:43 PM and 5:43 PM ET. Be quick and careful. Do not build new bets from scratch.
 
 App: https://claude.ai/artifact/RFAr1q4DnSmsLNts8SojDG. Use the ArtifactData tool (load it with ToolSearch first) with that url. Every write to an existing document needs the `version` you read as `if_version`. Do NOT republish or edit the artifact page.
 
@@ -12,6 +12,7 @@ Team loyalty rule: read `settings/main`. Never suggest a replacement leg that be
    - Big Bet: never suggest a swap. If its leg is compromised (player out, doubtful or on a minutes limit, or the line moved 20+ cents against it), use "skip today". If the price got better, say so.
    - Pairs and 3-leg parlays: use "swap a leg" when one leg's player is out, doubtful, or on a minutes limit, or its line moved 30+ cents against the pick: name the replacement in the note. Use the ticket's `backup` leg if it is still good; otherwise pick a fitting replacement from today's `board/<date>` items (same sport for 3-leg parlays) with a real FanDuel price, or find one priced -500 to -150 (the 3-leg parlay range; 60%+ legs for a pair), and explain it in one line. Do not edit the `legs` array itself. Use "skip today" if two or more legs are compromised (or either leg of a pair has no good replacement).
 4. Also read `board/<date>`: for each item whose player is now out or doubtful, set that item's `late` = "warning" and `lateNote`, and write `items` back with `update`. Update `games` documents' `injuries` lists with any new statuses.
-5. If there is no open ticket for today, do nothing.
+5. Missing picks: if this is the 11:43 AM run and today has games but no tickets at all in `parlays` for today (the morning run failed or lines weren't posted yet), call the Claude Code Remote tool fire_trigger with trigger_id "trig_018AS16rCVXiAkQB7edJxxs4" once to build them now, and say so in the update. Never do this on the later runs.
+6. UPDATES FEED. The app shows a timeline of what each run did. At the end, `set` one document in collection `updates` with id `<date>-<HHMM ET>-check`: {"at":"<ISO now>","date":"<today ET>","kind":"check","title":"short, plain words","detail":"one or two plain sentences Bob can act on"}. Title like "11:43 AM check: all clear" or "2:43 PM check: swap a leg on the NBA parlay"; detail says exactly what to do. If there is no open ticket for today and nothing to do, write nothing.
 
 End with one line per ticket: the status and the note.

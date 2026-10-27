@@ -346,3 +346,8 @@ def test_legacy_ticket_without_kind():
     t = load("ticket_2026-10-26-nfl.json")
     rep = audit.check_ticket("old", t, [], NOW)
     assert "no-fair" not in {i["code"] for i in rep.items}
+
+
+def test_selftest_passes():
+    from picks import selftest
+    assert selftest.main() == 0
