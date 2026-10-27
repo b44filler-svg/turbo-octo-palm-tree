@@ -17,7 +17,7 @@ Read `model/stats` (create it if missing). From every graded leg in `parlays` an
  "buckets":[{"range":"50-60","legs":N,"expected":x,"actual":x},{"range":"60-70",...},{"range":"70-80",...},{"range":"80-92",...}],
  "byType":[{"type":"prop over","legs":N,"hit":N},{"type":"prop under",...},{"type":"spread",...},{"type":"moneyline",...},{"type":"total over",...},{"type":"total under",...}],
  "bySport":[{"sport":"NBA","legs":N,"hit":N,"tickets":N,"ticketsWon":N},...],
- "byKind":[{"kind":"big","tickets":N,"won":N,"expected":x},{"kind":"pair",...},{"kind":"parlay3",...},{"kind":"board","tickets":N,"won":N,"expected":x}],
+ "byKind":[{"kind":"big","tickets":N,"won":N,"expected":x},{"kind":"pair",...},{"kind":"parlay3",...},{"kind":"boost",...},{"kind":"board","tickets":N,"won":N,"expected":x}],
  "auditFixes":N,"shrink":<market weight to use next>,"lesson":"one sentence on what the results say so far"}
 shrink starts at 0.5. Once a bucket has 30+ legs: if actual trails expected by more than 5 points, raise shrink by 0.05 (max 0.8); if actual beats expected by more than 5 points and avgClv > 0, lower it by 0.05 (min 0.35). Never change it by more than 0.05 per day.
 
