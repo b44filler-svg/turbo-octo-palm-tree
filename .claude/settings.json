@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3 -m picks.selftest)",
+      "Bash(python3 -m picks.build:*)",
+      "Bash(python3 -m picks.audit:*)"
+    ]
+  }
+}
