@@ -94,8 +94,10 @@ function mock(DATA) {
       big: document.querySelectorAll(".ticket.k-big").length, pair: document.querySelectorAll(".ticket.k-pair").length,
       parlay: document.querySelectorAll(".ticket.k-parlay3").length, board: document.querySelectorAll(".board li").length,
       sizing: document.querySelector(".sizing")?.textContent || "", audit: document.querySelectorAll(".audit").length,
+      glance: document.querySelectorAll(".glance li").length,
     }));
     if (counts.big !== 1 || counts.pair < 1 || counts.parlay < 1 || counts.board < 1) fail(`${width}px Today counts ${JSON.stringify(counts)}`);
+    if (counts.glance < 4) fail(`${width}px glance card has ${counts.glance} rows`);
     if (!/up to \$\d+|sit this one out/.test(counts.sizing)) fail(`${width}px Big Bet size guide missing: ${counts.sizing}`);
     await overflow("today");
     await page.screenshot({ path: path.join(process.env.SHOTS || "/tmp", `today-${width}.png`), fullPage: true });
