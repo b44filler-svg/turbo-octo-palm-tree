@@ -47,7 +47,7 @@ Step 6 - Write (one `batch` per collection where possible):
 - `board/<date>`: {"date","createdAt","items":[the engine's board legs, each with experts/articleNote/why/hitRate/median/source/sharpSource and "result":"open"],"note":"one sentence on the day's board"}.
 - `games` documents from Step 1.
 
-- UPDATES FEED. The app shows a timeline of what each run did. At the end, `set` one document in collection `updates` with id `<date>-<HHMM ET>-picks`: {"at":"<ISO now>","date":"<today ET>","kind":"picks","title":"short, plain words","detail":"one or two plain sentences Bob can act on"}. Title like "Today's picks are up: Big Bet, 2 pairs, NBA + NFL parlays"; detail names the Big Bet and anything skipped. If the run can't post tickets for any reason (a blocked step, failed self-test, no games), still write an update that says so plainly, so Bob isn't left wondering.
+- UPDATES FEED. The app shows a timeline of what each run did. At the end, `set` one document in collection `updates` with id `<date>-<HHMM ET>-picks`: {"at":"<ISO now>","date":"<today ET>","kind":"picks","title":"short, plain words","detail":"one or two plain sentences Bob can act on"}. Title like "Today's picks are up: Big Bet, 2 pairs, NBA + NFL parlays"; detail names the Big Bet and anything skipped. If the run can't post tickets for any reason (a blocked step, failed self-test, no games), still write an update that says so plainly, so Bob isn't left wondering. Also `set` or `update` `board/<date>` with `runStatus`: {"status":"error" (something broke) or "none" (no bet cleared the bar, or no games),"reason":"one plain sentence"}; the app shows it on the Today tab.
 
 Be honest: never call any bet a lock or guaranteed. Only use prices you actually found.
 

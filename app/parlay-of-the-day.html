@@ -768,11 +768,18 @@ function renderToday(){
     });
     mine.forEach(p=>box.append(ticket(p)));
     if(board){ const h = el("p","sport-head","Best Bets board"); h.id = "s-board"; box.append(h); renderBoard(box, board); }
+    const rs = found && found.runStatus;
+    if(rs && rs.reason){ const r = el("p","note"); r.append(el("b",null,"About today's run: "), String(rs.reason)); box.append(r); }
     return;
   }
-  const n = el("p","note");
-  if(docs.length){ n.append(el("b",null,"Today's picks aren't up yet. "), "They post around 11:37 AM ET, or tap Research new bets now. Here's the most recent one."); box.append(n); box.append(ticket(docs[0])); }
-  else { n.append(el("b",null,"No picks yet. "), "The first ones post at 11:37 AM ET."); box.append(n); }
+  const n = el("p","note"), rs = found && found.runStatus, recent = docs.length ? " Here's the most recent ticket." : "";
+  const hourET = Number(new Intl.DateTimeFormat("en-US",{timeZone:tz,hour:"numeric",hourCycle:"h23"}).format(new Date()));
+  if(rs && rs.status==="error") n.append(el("b",null,"Today's run hit a problem. "), (rs.reason ? String(rs.reason) + " " : "") + "Tap Research new bets now to try again." + recent);
+  else if(rs) n.append(el("b",null,"No bets today. "), (rs.reason ? String(rs.reason) + " " : "") + "Sitting out a day without a real edge is part of the plan." + recent);
+  else if(hourET >= 10) n.append(el("b",null,"Today's picks haven't posted. "), "The morning run didn't leave any picks or a reason. The 11:43 AM check starts a new run on its own, or tap Research new bets now." + recent);
+  else n.append(el("b",null,docs.length ? "Today's picks aren't up yet. " : "No picks yet. "), "They post by about 8 AM ET, or tap Research new bets now." + recent);
+  box.append(n);
+  if(docs.length) box.append(ticket(docs[0]));
   mine.forEach(p=>box.append(ticket(p)));
 }
 
@@ -1109,7 +1116,7 @@ renderAll();
   }, ()=>{ $("todayBox").replaceChildren(el("p","note","Couldn't load picks right now. Reopen the page in a minute.")); });
   db.collection("games").orderBy("date","desc").limit(120).onSnapshot(snap=>{ games = snap.docs.map(d=>Object.assign({_id:d.id}, d.data())); renderAll(); }, ()=>{});
   db.collection("updates").orderBy("at","desc").limit(30).onSnapshot(snap=>{ updates = snap.docs.map(d=>Object.assign({_id:d.id}, d.data())); renderToday(); }, ()=>{});
-    db.collection("board").orderBy("date","desc").limit(60).onSnapshot(snap=>{ boards = snap.docs.map(d=>Object.assign({_id:d.id}, d.data())); renderAll(); }, ()=>{});
+  db.collection("board").orderBy("date","desc").limit(60).onSnapshot(snap=>{ boards = snap.docs.map(d=>Object.assign({_id:d.id}, d.data())); renderAll(); }, ()=>{});
   db.doc("settings/main").onSnapshot(s=>{ if(s.exists){ settings = Object.assign({defaultStake:10, monthlyBudget:0}, s.data()); renderAll(); } }, ()=>{});
   db.doc("model/stats").onSnapshot(s=>{ modelStats = s.exists ? s.data() : null; renderProfit(); }, ()=>{});
   db.collection("changelog").orderBy("at","desc").limit(10).onSnapshot(snap=>{
