@@ -1,0 +1,1194 @@
+{
+  "date": "2026-10-27",
+  "shrink": 0.5,
+  "candidates": 13,
+  "dropped": [
+    {
+      "pick": "Dallas Cowboys Moneyline",
+      "why": "bets against Philadelphia Eagles"
+    }
+  ],
+  "board": [
+    {
+      "sport": "NBA",
+      "game": "Lakers @ Suns",
+      "start": "10:00 PM ET",
+      "pick": "Austin Reaves Under 5.5 Assists",
+      "market": "Assists",
+      "type": "prop under",
+      "team": "Los Angeles Lakers",
+      "player": "Austin Reaves",
+      "odds": -125,
+      "sharpOdds": [
+        -145,
+        125
+      ],
+      "hitRates": {
+        "season": [
+          3,
+          4
+        ],
+        "last10": [
+          7,
+          10
+        ],
+        "last5": [
+          4,
+          5
+        ],
+        "lastSeason": [
+          45,
+          70
+        ]
+      },
+      "source": "FanDuel Sportsbook",
+      "sharpSource": "Pinnacle",
+      "impliedProb": 0.556,
+      "fairProb": 0.575,
+      "statProb": 0.721,
+      "fairFlag": false,
+      "modelProb": 0.645,
+      "edge": 0.089,
+      "ev": 0.161,
+      "growth": 0.00712,
+      "result": "open",
+      "sweetSpot": true
+    },
+    {
+      "sport": "NFL",
+      "game": "Cowboys @ Eagles",
+      "start": "8:15 PM ET",
+      "pick": "Jalen Carter Over 0.5 Tackles",
+      "market": "Tackles",
+      "type": "prop over",
+      "team": "Philadelphia Eagles",
+      "player": "Jalen Carter",
+      "odds": -400,
+      "sharpOdds": [
+        -420,
+        320
+      ],
+      "hitRates": {
+        "season": [
+          6,
+          6
+        ],
+        "last10": [
+          10,
+          10
+        ],
+        "last5": [
+          5,
+          5
+        ],
+        "lastSeason": [
+          16,
+          17
+        ]
+      },
+      "source": "FanDuel Sportsbook",
+      "sharpSource": "Pinnacle",
+      "impliedProb": 0.8,
+      "fairProb": 0.792,
+      "statProb": 0.988,
+      "fairFlag": false,
+      "modelProb": 0.862,
+      "edge": 0.062,
+      "ev": 0.077,
+      "growth": 0.00537,
+      "result": "open",
+      "sweetSpot": false
+    },
+    {
+      "sport": "NBA",
+      "game": "Celtics @ Knicks",
+      "start": "7:30 PM ET",
+      "pick": "Jayson Tatum Under 3.5 Threes",
+      "market": "Threes",
+      "type": "prop under",
+      "team": "Boston Celtics",
+      "player": "Jayson Tatum",
+      "odds": -150,
+      "sharpOdds": [
+        -160,
+        130
+      ],
+      "hitRates": {
+        "season": [
+          3,
+          4
+        ],
+        "last10": [
+          7,
+          10
+        ],
+        "last5": [
+          4,
+          5
+        ],
+        "lastSeason": [
+          48,
+          72
+        ]
+      },
+      "source": "FanDuel Sportsbook",
+      "sharpSource": "Pinnacle",
+      "impliedProb": 0.6,
+      "fairProb": 0.593,
+      "statProb": 0.726,
+      "fairFlag": false,
+      "modelProb": 0.663,
+      "edge": 0.063,
+      "ev": 0.104,
+      "growth": 0.00359,
+      "result": "open",
+      "sweetSpot": false
+    },
+    {
+      "sport": "NBA",
+      "game": "Celtics @ Knicks",
+      "start": "7:30 PM ET",
+      "pick": "Jalen Brunson Over 24.5 Points",
+      "market": "Points",
+      "type": "prop over",
+      "team": "New York Knicks",
+      "player": "Jalen Brunson",
+      "star": true,
+      "odds": -115,
+      "sharpOdds": [
+        -130,
+        110
+      ],
+      "hitRates": {
+        "season": [
+          3,
+          4
+        ],
+        "last10": [
+          6,
+          10
+        ],
+        "last5": [
+          3,
+          5
+        ],
+        "lastSeason": [
+          44,
+          74
+        ]
+      },
+      "source": "FanDuel Sportsbook",
+      "sharpSource": "Pinnacle",
+      "impliedProb": 0.535,
+      "fairProb": 0.545,
+      "statProb": 0.651,
+      "fairFlag": false,
+      "modelProb": 0.588,
+      "edge": 0.054,
+      "ev": 0.1,
+      "growth": 0.00252,
+      "result": "open",
+      "sweetSpot": true
+    },
+    {
+      "sport": "MLB",
+      "game": "Rays @ Brewers",
+      "start": "8:08 PM ET",
+      "pick": "Freddy Peralta Over 14.5 Outs",
+      "market": "Outs recorded",
+      "type": "prop over",
+      "team": "Milwaukee Brewers",
+      "player": "Freddy Peralta",
+      "odds": -160,
+      "sharpOdds": [
+        -175,
+        145
+      ],
+      "hitRates": {
+        "season": [
+          22,
+          32
+        ],
+        "last10": [
+          7,
+          10
+        ],
+        "last5": [
+          4,
+          5
+        ],
+        "lastSeason": [
+          20,
+          32
+        ]
+      },
+      "source": "FanDuel Sportsbook",
+      "sharpSource": "Pinnacle",
+      "impliedProb": 0.615,
+      "fairProb": 0.617,
+      "statProb": 0.696,
+      "fairFlag": false,
+      "modelProb": 0.656,
+      "edge": 0.041,
+      "ev": 0.066,
+      "growth": 0.00154,
+      "result": "open",
+      "sweetSpot": false
+    },
+    {
+      "sport": "MLB",
+      "game": "Rays @ Brewers",
+      "start": "8:08 PM ET",
+      "pick": "Jackson Chourio Over 0.5 Hits",
+      "market": "Hits",
+      "type": "prop over",
+      "team": "Milwaukee Brewers",
+      "player": "Jackson Chourio",
+      "odds": -230,
+      "sharpOdds": [
+        -240,
+        190
+      ],
+      "hitRates": {
+        "season": [
+          110,
+          150
+        ],
+        "last10": [
+          8,
+          10
+        ],
+        "last5": [
+          4,
+          5
+        ]
+      },
+      "source": "FanDuel Sportsbook",
+      "sharpSource": "Pinnacle",
+      "impliedProb": 0.697,
+      "fairProb": 0.685,
+      "statProb": 0.771,
+      "fairFlag": false,
+      "modelProb": 0.728,
+      "edge": 0.031,
+      "ev": 0.045,
+      "growth": 0.001,
+      "result": "open",
+      "sweetSpot": false
+    },
+    {
+      "sport": "NBA",
+      "game": "Jazz @ Nuggets",
+      "start": "9:00 PM ET",
+      "pick": "Denver Nuggets Moneyline",
+      "market": "Moneyline",
+      "type": "moneyline",
+      "team": "Denver Nuggets",
+      "odds": -280,
+      "sharpOdds": [
+        -320,
+        260
+      ],
+      "source": "FanDuel Sportsbook",
+      "sharpSource": "Pinnacle",
+      "impliedProb": 0.737,
+      "fairProb": 0.747,
+      "statProb": null,
+      "fairFlag": false,
+      "modelProb": 0.747,
+      "edge": 0.01,
+      "ev": 0.014,
+      "growth": 0.00012,
+      "result": "open",
+      "sweetSpot": false
+    },
+    {
+      "sport": "NBA",
+      "game": "Bulls @ Heat",
+      "start": "7:30 PM ET",
+      "pick": "Miami Heat Moneyline",
+      "market": "Moneyline",
+      "type": "moneyline",
+      "team": "Miami Heat",
+      "odds": -300,
+      "sharpOdds": [
+        -340,
+        275
+      ],
+      "source": "FanDuel Sportsbook",
+      "sharpSource": "Pinnacle",
+      "impliedProb": 0.75,
+      "fairProb": 0.758,
+      "statProb": null,
+      "fairFlag": false,
+      "modelProb": 0.758,
+      "edge": 0.008,
+      "ev": 0.011,
+      "growth": 8e-05,
+      "result": "open",
+      "sweetSpot": false
+    },
+    {
+      "sport": "MLB",
+      "game": "Rays @ Brewers",
+      "start": "8:08 PM ET",
+      "pick": "Under 8.5 Runs",
+      "market": "Total",
+      "type": "total under",
+      "odds": -180,
+      "sharpOdds": [
+        -200,
+        165
+      ],
+      "source": "FanDuel Sportsbook",
+      "sharpSource": "Pinnacle",
+      "impliedProb": 0.643,
+      "fairProb": 0.648,
+      "statProb": null,
+      "fairFlag": false,
+      "modelProb": 0.648,
+      "edge": 0.005,
+      "ev": 0.008,
+      "growth": 2e-05,
+      "result": "open",
+      "sweetSpot": false
+    }
+  ],
+  "big": {
+    "kind": "big",
+    "date": "2026-10-27",
+    "sport": "NBA",
+    "legs": [
+      {
+        "sport": "NBA",
+        "game": "Lakers @ Suns",
+        "start": "10:00 PM ET",
+        "pick": "Austin Reaves Under 5.5 Assists",
+        "market": "Assists",
+        "type": "prop under",
+        "team": "Los Angeles Lakers",
+        "player": "Austin Reaves",
+        "odds": -125,
+        "sharpOdds": [
+          -145,
+          125
+        ],
+        "hitRates": {
+          "season": [
+            3,
+            4
+          ],
+          "last10": [
+            7,
+            10
+          ],
+          "last5": [
+            4,
+            5
+          ],
+          "lastSeason": [
+            45,
+            70
+          ]
+        },
+        "source": "FanDuel Sportsbook",
+        "sharpSource": "Pinnacle",
+        "impliedProb": 0.556,
+        "fairProb": 0.575,
+        "statProb": 0.721,
+        "fairFlag": false,
+        "modelProb": 0.645,
+        "edge": 0.089,
+        "ev": 0.161,
+        "growth": 0.00712,
+        "result": "open"
+      }
+    ],
+    "parlayOdds": -125,
+    "payout10": 18.0,
+    "winChance": 0.645,
+    "ev": 0.161,
+    "growth": 0.00713,
+    "result": "open",
+    "placed": false,
+    "kellyFull": 0.2013
+  },
+  "pairs": [
+    {
+      "kind": "pair",
+      "date": "2026-10-27",
+      "sport": "Mix",
+      "legs": [
+        {
+          "sport": "NFL",
+          "game": "Cowboys @ Eagles",
+          "start": "8:15 PM ET",
+          "pick": "Jalen Carter Over 0.5 Tackles",
+          "market": "Tackles",
+          "type": "prop over",
+          "team": "Philadelphia Eagles",
+          "player": "Jalen Carter",
+          "odds": -400,
+          "sharpOdds": [
+            -420,
+            320
+          ],
+          "hitRates": {
+            "season": [
+              6,
+              6
+            ],
+            "last10": [
+              10,
+              10
+            ],
+            "last5": [
+              5,
+              5
+            ],
+            "lastSeason": [
+              16,
+              17
+            ]
+          },
+          "source": "FanDuel Sportsbook",
+          "sharpSource": "Pinnacle",
+          "impliedProb": 0.8,
+          "fairProb": 0.792,
+          "statProb": 0.988,
+          "fairFlag": false,
+          "modelProb": 0.862,
+          "edge": 0.062,
+          "ev": 0.077,
+          "growth": 0.00537,
+          "result": "open"
+        },
+        {
+          "sport": "NBA",
+          "game": "Celtics @ Knicks",
+          "start": "7:30 PM ET",
+          "pick": "Jayson Tatum Under 3.5 Threes",
+          "market": "Threes",
+          "type": "prop under",
+          "team": "Boston Celtics",
+          "player": "Jayson Tatum",
+          "odds": -150,
+          "sharpOdds": [
+            -160,
+            130
+          ],
+          "hitRates": {
+            "season": [
+              3,
+              4
+            ],
+            "last10": [
+              7,
+              10
+            ],
+            "last5": [
+              4,
+              5
+            ],
+            "lastSeason": [
+              48,
+              72
+            ]
+          },
+          "source": "FanDuel Sportsbook",
+          "sharpSource": "Pinnacle",
+          "impliedProb": 0.6,
+          "fairProb": 0.593,
+          "statProb": 0.726,
+          "fairFlag": false,
+          "modelProb": 0.663,
+          "edge": 0.063,
+          "ev": 0.104,
+          "growth": 0.00359,
+          "result": "open"
+        }
+      ],
+      "parlayOdds": 108,
+      "payout10": 20.83,
+      "winChance": 0.572,
+      "ev": 0.191,
+      "growth": 0.00733,
+      "result": "open",
+      "placed": false
+    },
+    {
+      "kind": "pair",
+      "date": "2026-10-27",
+      "sport": "Mix",
+      "legs": [
+        {
+          "sport": "NBA",
+          "game": "Jazz @ Nuggets",
+          "start": "9:00 PM ET",
+          "pick": "Denver Nuggets Moneyline",
+          "market": "Moneyline",
+          "type": "moneyline",
+          "team": "Denver Nuggets",
+          "odds": -280,
+          "sharpOdds": [
+            -320,
+            260
+          ],
+          "source": "FanDuel Sportsbook",
+          "sharpSource": "Pinnacle",
+          "impliedProb": 0.737,
+          "fairProb": 0.747,
+          "statProb": null,
+          "fairFlag": false,
+          "modelProb": 0.747,
+          "edge": 0.01,
+          "ev": 0.014,
+          "growth": 0.00012,
+          "result": "open"
+        },
+        {
+          "sport": "MLB",
+          "game": "Rays @ Brewers",
+          "start": "8:08 PM ET",
+          "pick": "Freddy Peralta Over 14.5 Outs",
+          "market": "Outs recorded",
+          "type": "prop over",
+          "team": "Milwaukee Brewers",
+          "player": "Freddy Peralta",
+          "odds": -160,
+          "sharpOdds": [
+            -175,
+            145
+          ],
+          "hitRates": {
+            "season": [
+              22,
+              32
+            ],
+            "last10": [
+              7,
+              10
+            ],
+            "last5": [
+              4,
+              5
+            ],
+            "lastSeason": [
+              20,
+              32
+            ]
+          },
+          "source": "FanDuel Sportsbook",
+          "sharpSource": "Pinnacle",
+          "impliedProb": 0.615,
+          "fairProb": 0.617,
+          "statProb": 0.696,
+          "fairFlag": false,
+          "modelProb": 0.656,
+          "edge": 0.041,
+          "ev": 0.066,
+          "growth": 0.00154,
+          "result": "open"
+        }
+      ],
+      "parlayOdds": 121,
+      "payout10": 22.05,
+      "winChance": 0.49,
+      "ev": 0.081,
+      "growth": 0.00118,
+      "result": "open",
+      "placed": false
+    }
+  ],
+  "parlays": {
+    "MLB": {
+      "kind": "parlay3",
+      "date": "2026-10-27",
+      "sport": "MLB",
+      "legs": [
+        {
+          "sport": "MLB",
+          "game": "Rays @ Brewers",
+          "start": "8:08 PM ET",
+          "pick": "Jackson Chourio Over 0.5 Hits",
+          "market": "Hits",
+          "type": "prop over",
+          "team": "Milwaukee Brewers",
+          "player": "Jackson Chourio",
+          "odds": -230,
+          "sharpOdds": [
+            -240,
+            190
+          ],
+          "hitRates": {
+            "season": [
+              110,
+              150
+            ],
+            "last10": [
+              8,
+              10
+            ],
+            "last5": [
+              4,
+              5
+            ]
+          },
+          "source": "FanDuel Sportsbook",
+          "sharpSource": "Pinnacle",
+          "impliedProb": 0.697,
+          "fairProb": 0.685,
+          "statProb": 0.771,
+          "fairFlag": false,
+          "modelProb": 0.728,
+          "edge": 0.031,
+          "ev": 0.045,
+          "growth": 0.001,
+          "result": "open"
+        },
+        {
+          "sport": "MLB",
+          "game": "Rays @ Brewers",
+          "start": "8:08 PM ET",
+          "pick": "Under 8.5 Runs",
+          "market": "Total",
+          "type": "total under",
+          "odds": -180,
+          "sharpOdds": [
+            -200,
+            165
+          ],
+          "source": "FanDuel Sportsbook",
+          "sharpSource": "Pinnacle",
+          "impliedProb": 0.643,
+          "fairProb": 0.648,
+          "statProb": null,
+          "fairFlag": false,
+          "modelProb": 0.648,
+          "edge": 0.005,
+          "ev": 0.008,
+          "growth": 2e-05,
+          "result": "open"
+        },
+        {
+          "sport": "MLB",
+          "game": "Rays @ Brewers",
+          "start": "8:08 PM ET",
+          "pick": "Freddy Peralta Over 14.5 Outs",
+          "market": "Outs recorded",
+          "type": "prop over",
+          "team": "Milwaukee Brewers",
+          "player": "Freddy Peralta",
+          "odds": -160,
+          "sharpOdds": [
+            -175,
+            145
+          ],
+          "hitRates": {
+            "season": [
+              22,
+              32
+            ],
+            "last10": [
+              7,
+              10
+            ],
+            "last5": [
+              4,
+              5
+            ],
+            "lastSeason": [
+              20,
+              32
+            ]
+          },
+          "source": "FanDuel Sportsbook",
+          "sharpSource": "Pinnacle",
+          "impliedProb": 0.615,
+          "fairProb": 0.617,
+          "statProb": 0.696,
+          "fairFlag": false,
+          "modelProb": 0.656,
+          "edge": 0.041,
+          "ev": 0.066,
+          "growth": 0.00154,
+          "result": "open"
+        }
+      ],
+      "parlayOdds": 263,
+      "payout10": 36.27,
+      "winChance": 0.282,
+      "ev": 0.024,
+      "growth": 5e-05,
+      "result": "open",
+      "placed": false
+    },
+    "NBA": {
+      "kind": "parlay3",
+      "date": "2026-10-27",
+      "sport": "NBA",
+      "legs": [
+        {
+          "sport": "NBA",
+          "game": "Bulls @ Heat",
+          "start": "7:30 PM ET",
+          "pick": "Miami Heat Moneyline",
+          "market": "Moneyline",
+          "type": "moneyline",
+          "team": "Miami Heat",
+          "odds": -300,
+          "sharpOdds": [
+            -340,
+            275
+          ],
+          "source": "FanDuel Sportsbook",
+          "sharpSource": "Pinnacle",
+          "impliedProb": 0.75,
+          "fairProb": 0.758,
+          "statProb": null,
+          "fairFlag": false,
+          "modelProb": 0.758,
+          "edge": 0.008,
+          "ev": 0.011,
+          "growth": 8e-05,
+          "result": "open"
+        },
+        {
+          "sport": "NBA",
+          "game": "Jazz @ Nuggets",
+          "start": "9:00 PM ET",
+          "pick": "Denver Nuggets Moneyline",
+          "market": "Moneyline",
+          "type": "moneyline",
+          "team": "Denver Nuggets",
+          "odds": -280,
+          "sharpOdds": [
+            -320,
+            260
+          ],
+          "source": "FanDuel Sportsbook",
+          "sharpSource": "Pinnacle",
+          "impliedProb": 0.737,
+          "fairProb": 0.747,
+          "statProb": null,
+          "fairFlag": false,
+          "modelProb": 0.747,
+          "edge": 0.01,
+          "ev": 0.014,
+          "growth": 0.00012,
+          "result": "open"
+        },
+        {
+          "sport": "NBA",
+          "game": "Celtics @ Knicks",
+          "start": "7:30 PM ET",
+          "pick": "Jayson Tatum Under 3.5 Threes",
+          "market": "Threes",
+          "type": "prop under",
+          "team": "Boston Celtics",
+          "player": "Jayson Tatum",
+          "odds": -150,
+          "sharpOdds": [
+            -160,
+            130
+          ],
+          "hitRates": {
+            "season": [
+              3,
+              4
+            ],
+            "last10": [
+              7,
+              10
+            ],
+            "last5": [
+              4,
+              5
+            ],
+            "lastSeason": [
+              48,
+              72
+            ]
+          },
+          "source": "FanDuel Sportsbook",
+          "sharpSource": "Pinnacle",
+          "impliedProb": 0.6,
+          "fairProb": 0.593,
+          "statProb": 0.726,
+          "fairFlag": false,
+          "modelProb": 0.663,
+          "edge": 0.063,
+          "ev": 0.104,
+          "growth": 0.00359,
+          "result": "open"
+        }
+      ],
+      "parlayOdds": 202,
+      "payout10": 30.16,
+      "winChance": 0.375,
+      "ev": 0.132,
+      "growth": 0.00188,
+      "result": "open",
+      "placed": false
+    }
+  },
+  "top5": {
+    "MLB": [
+      {
+        "kind": "parlay3",
+        "date": "2026-10-27",
+        "sport": "MLB",
+        "legs": [
+          {
+            "sport": "MLB",
+            "game": "Rays @ Brewers",
+            "start": "8:08 PM ET",
+            "pick": "Tampa Bay Rays +1.5",
+            "market": "Run line",
+            "type": "spread",
+            "team": "Tampa Bay Rays",
+            "odds": -200,
+            "sharpOdds": [
+              -215,
+              180
+            ],
+            "source": "FanDuel Sportsbook",
+            "sharpSource": "Pinnacle",
+            "impliedProb": 0.667,
+            "fairProb": 0.666,
+            "statProb": null,
+            "fairFlag": false,
+            "modelProb": 0.666,
+            "edge": -0.001,
+            "ev": -0.001,
+            "growth": 0.0,
+            "result": "open"
+          },
+          {
+            "sport": "MLB",
+            "game": "Rays @ Brewers",
+            "start": "8:08 PM ET",
+            "pick": "Jackson Chourio Over 0.5 Hits",
+            "market": "Hits",
+            "type": "prop over",
+            "team": "Milwaukee Brewers",
+            "player": "Jackson Chourio",
+            "odds": -230,
+            "sharpOdds": [
+              -240,
+              190
+            ],
+            "hitRates": {
+              "season": [
+                110,
+                150
+              ],
+              "last10": [
+                8,
+                10
+              ],
+              "last5": [
+                4,
+                5
+              ]
+            },
+            "source": "FanDuel Sportsbook",
+            "sharpSource": "Pinnacle",
+            "impliedProb": 0.697,
+            "fairProb": 0.685,
+            "statProb": 0.771,
+            "fairFlag": false,
+            "modelProb": 0.728,
+            "edge": 0.031,
+            "ev": 0.045,
+            "growth": 0.001,
+            "result": "open"
+          },
+          {
+            "sport": "MLB",
+            "game": "Rays @ Brewers",
+            "start": "8:08 PM ET",
+            "pick": "Freddy Peralta Over 14.5 Outs",
+            "market": "Outs recorded",
+            "type": "prop over",
+            "team": "Milwaukee Brewers",
+            "player": "Freddy Peralta",
+            "odds": -160,
+            "sharpOdds": [
+              -175,
+              145
+            ],
+            "hitRates": {
+              "season": [
+                22,
+                32
+              ],
+              "last10": [
+                7,
+                10
+              ],
+              "last5": [
+                4,
+                5
+              ],
+              "lastSeason": [
+                20,
+                32
+              ]
+            },
+            "source": "FanDuel Sportsbook",
+            "sharpSource": "Pinnacle",
+            "impliedProb": 0.615,
+            "fairProb": 0.617,
+            "statProb": 0.696,
+            "fairFlag": false,
+            "modelProb": 0.656,
+            "edge": 0.041,
+            "ev": 0.066,
+            "growth": 0.00154,
+            "result": "open"
+          }
+        ],
+        "parlayOdds": 250,
+        "payout10": 34.97,
+        "winChance": 0.29,
+        "ev": 0.015,
+        "growth": 2e-05,
+        "result": "open",
+        "placed": false
+      },
+      {
+        "kind": "parlay3",
+        "date": "2026-10-27",
+        "sport": "MLB",
+        "legs": [
+          {
+            "sport": "MLB",
+            "game": "Rays @ Brewers",
+            "start": "8:08 PM ET",
+            "pick": "Jackson Chourio Over 0.5 Hits",
+            "market": "Hits",
+            "type": "prop over",
+            "team": "Milwaukee Brewers",
+            "player": "Jackson Chourio",
+            "odds": -230,
+            "sharpOdds": [
+              -240,
+              190
+            ],
+            "hitRates": {
+              "season": [
+                110,
+                150
+              ],
+              "last10": [
+                8,
+                10
+              ],
+              "last5": [
+                4,
+                5
+              ]
+            },
+            "source": "FanDuel Sportsbook",
+            "sharpSource": "Pinnacle",
+            "impliedProb": 0.697,
+            "fairProb": 0.685,
+            "statProb": 0.771,
+            "fairFlag": false,
+            "modelProb": 0.728,
+            "edge": 0.031,
+            "ev": 0.045,
+            "growth": 0.001,
+            "result": "open"
+          },
+          {
+            "sport": "MLB",
+            "game": "Rays @ Brewers",
+            "start": "8:08 PM ET",
+            "pick": "Under 8.5 Runs",
+            "market": "Total",
+            "type": "total under",
+            "odds": -180,
+            "sharpOdds": [
+              -200,
+              165
+            ],
+            "source": "FanDuel Sportsbook",
+            "sharpSource": "Pinnacle",
+            "impliedProb": 0.643,
+            "fairProb": 0.648,
+            "statProb": null,
+            "fairFlag": false,
+            "modelProb": 0.648,
+            "edge": 0.005,
+            "ev": 0.008,
+            "growth": 2e-05,
+            "result": "open"
+          },
+          {
+            "sport": "MLB",
+            "game": "Rays @ Brewers",
+            "start": "8:08 PM ET",
+            "pick": "Freddy Peralta Over 14.5 Outs",
+            "market": "Outs recorded",
+            "type": "prop over",
+            "team": "Milwaukee Brewers",
+            "player": "Freddy Peralta",
+            "odds": -160,
+            "sharpOdds": [
+              -175,
+              145
+            ],
+            "hitRates": {
+              "season": [
+                22,
+                32
+              ],
+              "last10": [
+                7,
+                10
+              ],
+              "last5": [
+                4,
+                5
+              ],
+              "lastSeason": [
+                20,
+                32
+              ]
+            },
+            "source": "FanDuel Sportsbook",
+            "sharpSource": "Pinnacle",
+            "impliedProb": 0.615,
+            "fairProb": 0.617,
+            "statProb": 0.696,
+            "fairFlag": false,
+            "modelProb": 0.656,
+            "edge": 0.041,
+            "ev": 0.066,
+            "growth": 0.00154,
+            "result": "open"
+          }
+        ],
+        "parlayOdds": 263,
+        "payout10": 36.27,
+        "winChance": 0.282,
+        "ev": 0.024,
+        "growth": 5e-05,
+        "result": "open",
+        "placed": false
+      }
+    ],
+    "NBA": [
+      {
+        "kind": "parlay3",
+        "date": "2026-10-27",
+        "sport": "NBA",
+        "legs": [
+          {
+            "sport": "NBA",
+            "game": "Bulls @ Heat",
+            "start": "7:30 PM ET",
+            "pick": "Miami Heat Moneyline",
+            "market": "Moneyline",
+            "type": "moneyline",
+            "team": "Miami Heat",
+            "odds": -300,
+            "sharpOdds": [
+              -340,
+              275
+            ],
+            "source": "FanDuel Sportsbook",
+            "sharpSource": "Pinnacle",
+            "impliedProb": 0.75,
+            "fairProb": 0.758,
+            "statProb": null,
+            "fairFlag": false,
+            "modelProb": 0.758,
+            "edge": 0.008,
+            "ev": 0.011,
+            "growth": 8e-05,
+            "result": "open"
+          },
+          {
+            "sport": "NBA",
+            "game": "Jazz @ Nuggets",
+            "start": "9:00 PM ET",
+            "pick": "Denver Nuggets Moneyline",
+            "market": "Moneyline",
+            "type": "moneyline",
+            "team": "Denver Nuggets",
+            "odds": -280,
+            "sharpOdds": [
+              -320,
+              260
+            ],
+            "source": "FanDuel Sportsbook",
+            "sharpSource": "Pinnacle",
+            "impliedProb": 0.737,
+            "fairProb": 0.747,
+            "statProb": null,
+            "fairFlag": false,
+            "modelProb": 0.747,
+            "edge": 0.01,
+            "ev": 0.014,
+            "growth": 0.00012,
+            "result": "open"
+          },
+          {
+            "sport": "NBA",
+            "game": "Celtics @ Knicks",
+            "start": "7:30 PM ET",
+            "pick": "Jayson Tatum Under 3.5 Threes",
+            "market": "Threes",
+            "type": "prop under",
+            "team": "Boston Celtics",
+            "player": "Jayson Tatum",
+            "odds": -150,
+            "sharpOdds": [
+              -160,
+              130
+            ],
+            "hitRates": {
+              "season": [
+                3,
+                4
+              ],
+              "last10": [
+                7,
+                10
+              ],
+              "last5": [
+                4,
+                5
+              ],
+              "lastSeason": [
+                48,
+                72
+              ]
+            },
+            "source": "FanDuel Sportsbook",
+            "sharpSource": "Pinnacle",
+            "impliedProb": 0.6,
+            "fairProb": 0.593,
+            "statProb": 0.726,
+            "fairFlag": false,
+            "modelProb": 0.663,
+            "edge": 0.063,
+            "ev": 0.104,
+            "growth": 0.00359,
+            "result": "open"
+          }
+        ],
+        "parlayOdds": 202,
+        "payout10": 30.16,
+        "winChance": 0.375,
+        "ev": 0.132,
+        "growth": 0.00188,
+        "result": "open",
+        "placed": false
+      }
+    ]
+  }
+}

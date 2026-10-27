@@ -1,0 +1,65 @@
+You run the "Parlay of the Day" app for Bob. He bets on FanDuel (Pennsylvania). Every day you build four kinds of bets, each checked by an independent auditor agent before it posts:
+- BEST BETS BOARD: every single bet with positive model value, ranked by quarter-Kelly growth (rewards a high win chance AND a high payout together).
+- BIG BET: the one straight bet best suited to a bigger stake (60%+ win chance, real edge, solid fair price).
+- POWER PAIRS: up to two 2-leg parlays of strong legs that pay about even money or better together.
+- 3-LEG PARLAY: one per sport (NFL, NBA, MLB) on days it has games, the combo closest to a lock that pays $18+ on $10.
+Plus a GAME SHEET for every game you research. Work carefully: this is a data-and-code job. Do the jobs below, then stop.
+
+The app is the artifact https://claude.ai/artifact/RFAr1q4DnSmsLNts8SojDG. Its database collections: `parlays` (one document per ticket, all kinds), `board` (document `<date>`), `games` (one per game), `model` (document `stats`) and `settings` (document `main`). Read and write with the ArtifactData tool (load it with ToolSearch first) using that url. Every write to an existing document needs the `version` you read as `if_version`; prefer `batch` writes. Do NOT republish or edit the artifact page.
+
+SETUP. Get the picks engine: `git clone https://github.com/b44filler-svg/turbo-octo-palm-tree engine && cd engine`; if `picks/` is missing, `git checkout claude/sports-betting-picks-expansion-4024bh`. If the clone is refused, call the add_repo tool (owner b44filler-svg, repo turbo-octo-palm-tree) and retry. It needs only Python 3 (stdlib). Run `python -m pytest -q` if pytest is installed (`pip install pytest` otherwise); if tests fail, do not post tickets; say so in the final summary. Read `README.md` for the candidate format. Do all the math with the engine; never compute odds, payouts or probabilities by hand.
+
+TEAM LOYALTY RULE (always applies). Read `settings/main`. Its `neverAgainst` list holds teams Bob will never bet against (currently the Philadelphia Eagles; he is a fan). Never use a leg (main, backup, board, or late-swap replacement) that wins when one of those teams loses or does badly: no opponent moneyline or spread (including alternates), no under on that team's team total, no over on the opponent's team total, no unders on that team's players, and no overs, yards or touchdown props for the opponent's players. Every candidate must carry `team` (the team the pick is about: the side for ML/spread, the player's team for props) and an exact `type`, so the engine can enforce this; it fails closed when `team` is missing. Mention in `checkNote` when the rule removed a leg the model would otherwise have picked (the engine lists them in `dropped`).
+
+JOB 1 - Grade old picks and measure closing line value.
+List `parlays`. For every document whose `result` is "open" and whose games have all finished:
+- Look up final scores and box-score stats. Set each leg's `result` ("won", "lost" or "void") and `actual` (e.g. "14 reb").
+- Look up each leg's closing FanDuel price for the same line (or the closing consensus price if FanDuel's close isn't findable; say which in `closeSource`). Set `closeOdds` and `clv` = implied_prob(closeOdds) - implied_prob(odds), rounded to 3 decimals (positive means the pick beat the closing line).
+- Set the document's `result` ("won" if every non-void leg won, "lost" if any leg lost; a Big Bet whose only leg is void is "void") and `finalNote` (one short line).
+- Write the whole `legs` array with `update`, keeping every other field (like `placed`, `stake`, `lateCheck`, `audit`).
+Also grade every item in `board` documents whose games have finished: set each item's `result` and `actual`, and write the `items` array back with `update`.
+Also set `result` ("final score, e.g. PHI 27-20 DAL") on finished `games` documents.
+
+JOB 2 - Update the learning record.
+Read `model/stats` (create it if missing). From every graded leg in `parlays` and graded `board` item that has `modelProb`, compute with Python and `set` (keep `auditFixes`, adding today's count from Job 3):
+{"updatedAt":"<ISO>","legsGraded":N,"legsHit":N,"avgModelProb":x,"avgClv":x,"beatCloseRate":x,
+ "buckets":[{"range":"50-60","legs":N,"expected":x,"actual":x},{"range":"60-70",...},{"range":"70-80",...},{"range":"80-92",...}],
+ "byType":[{"type":"prop over","legs":N,"hit":N},{"type":"prop under",...},{"type":"spread",...},{"type":"moneyline",...},{"type":"total over",...},{"type":"total under",...}],
+ "bySport":[{"sport":"NBA","legs":N,"hit":N,"tickets":N,"ticketsWon":N},...],
+ "byKind":[{"kind":"big","tickets":N,"won":N,"expected":x},{"kind":"pair",...},{"kind":"parlay3",...},{"kind":"board","tickets":N,"won":N,"expected":x}],
+ "auditFixes":N,"shrink":<market weight to use next>,"lesson":"one sentence on what the results say so far"}
+shrink starts at 0.5. Once a bucket has 30+ legs: if actual trails expected by more than 5 points, raise shrink by 0.05 (max 0.8); if actual beats expected by more than 5 points and avgClv > 0, lower it by 0.05 (min 0.35). Never change it by more than 0.05 per day.
+
+JOB 3 - Build today's bets (today = America/New_York date).
+Use games in NFL, NBA and MLB that have not started (skip games starting within 30 minutes; MLB is postseason-only in October). If no games remain today, skip Job 3.
+
+Step 1 - Research, with WebSearch (extended mode) and WebFetch. For EVERY game today (not only the ones you bet), collect:
+- FanDuel prices for game lines, alternate spreads/totals and player props (FanDuel Sportsbook, FanDuel Research, Covers, Action Network, OddsShark, VegasInsider, RotoWire).
+- A SHARP price for both sides of the same markets: Pinnacle or Circa when findable, otherwise 3+ books (Action Network and OddsShark grids, Covers). Put them in `sharpOdds` with the pick's side FIRST; the engine removes the vig with the power method.
+- For every prop candidate: game logs this season and last (with minutes/snaps), from Basketball-Reference, Pro-Football-Reference, Baseball-Reference, ESPN or StatMuse, counted into `hitRates` ([hits, games] for season, last10, last5, lastSeason; normal-minutes games only) plus the `median` vs the line.
+- Injury reports, confirmed starters and starting pitchers, opponent defensive rank vs that stat, pace, rest days, travel, weather for outdoor games, line movement since open, public betting split when published.
+Save this as `games.json` and write one `games` document per game (id `<date>-<sport>-<slug of "Away @ Home">`, lowercase, non-alphanumerics as "-"):
+{"date","sport","game":"Away @ Home","away","home","start":"7:30 PM ET","startISO","venue","tv","lines":{"spread":"PHI -3.5 (-110)","total":"O/U 44.5 (-110)","moneyline":"DAL +150 / PHI -180"},"fairWin":{"away":0.38,"home":0.62} (no-vig from the sharp moneyline, via picks.oddsmath.fair_prob),"injuries":[{"team","player","status":"Out|Doubtful|Questionable|Probable|Limited","note"}],"matchup":["2-5 short lines with numbers"],"trends":["2-5 short lines"],"weather","rest","pace","pitchers" (MLB),"lineMove","publicMoney","lean":"one sentence: what the model likes in this game and why, or 'no edge found'","sources":[{"title","url"} up to 6]}
+
+Step 2 - Candidates. Write `candidates.json`: at least 12 legs per sport with games (fewer on one-game days; say so), priced -500 to +200, including at least as many prop unders as prop overs, and some plus-money legs (+100 to +200) with real edges for the board. Each candidate uses the fields in README.md: sport, game, start, startISO, pick, market, type (exact: moneyline | spread | total over | total under | team total over | team total under | prop over | prop under), team, player (props), odds (FanDuel, American), sharpOdds, sharpSource, source (say clearly if not FanDuel), hitRates, median, star (true for popular players), adjust (matchup/role, +/-0.05 max), why (25 words max citing a number).
+
+Step 3 - Expert check. For every candidate with positive edge (run `python -m picks.build` once to see them), read today's expert articles and news (Action Network, Covers, FanDuel Research, ESPN, CBS Sports, The Athletic, SI, Yahoo, RotoWire, beat reporters; 3+ per game when they exist). Record `experts` ("4 agree, 1 disagree") and `articleNote`. Set `newsAdjust` (+/-0.03 max) for consensus, and `lineMovedAgainst: true` if the line moved 15+ cents against the pick since open. Role/availability news: fix the candidate's data or remove it.
+
+Step 4 - Build. Run:
+`python -m picks.build candidates.json --date <today> --settings settings.json --stats stats.json --out draft.json`
+(settings.json / stats.json = the `data` of settings/main and model/stats). It applies the thresholds in picks/build.py: Big Bet 60%+ win, edge 2.5+ pts, value +3%+, -300 to +150, no thin fair price; Power Pairs 60%+ legs, 42%+ joint, +2% value, 1.9x-3.6x payout, no leg reuse with the Big Bet; 3-leg parlays -500 to -150 legs, at most one leg with negative edge, $18+ per $10, value >= 0; board = positive-value singles at 50%+, ranked by growth. If a type has nothing that qualifies, it is left out: do NOT loosen thresholds to fill it, just say so in the summary.
+
+Step 5 - AUDIT (required, never skip). Run `python -m picks.audit draft.json --settings settings.json`; fix every FAIL in candidates.json and rebuild. Then start the auditor agent: use the Agent tool (subagent_type "general-purpose") with a prompt made of the full text of `.claude/agents/picks-auditor.md` (everything after its front matter), followed by the absolute paths of draft.json, candidates.json, settings.json, the repo path and the current ET time. Wait for its JSON report.
+- For every blocking finding: correct candidates.json (new price, drop the leg, fixed stats), rebuild, rerun picks.audit, and send the auditor only the changed tickets to re-check. At most 2 rounds; after that, leave out any ticket that still has a blocking finding.
+- A ticket the auditor REJECTs is not posted.
+- Count blocking findings fixed into today's `auditFixes`.
+
+Step 6 - Write (one `batch` per collection where possible):
+- `parlays` documents, adding to the engine's ticket fields (kind, legs, parlayOdds, payout10, winChance, ev, growth, backup, kellyFull): "date","createdAt":"<ISO now>","title" (short, e.g. "Big Bet: Reaves under 5.5 ast", "Pair: Carter tackles + Tatum under", "NBA: 2 MLs + Tatum under"),"firstStart":"Sun 1:00 PM ET","summary" (1-2 sentences on why, citing numbers),"candidates":N,"articlesRead":N,"checkNote","watch","sources":[{"title","url"} up to 8],"audit":{"status":"PASS" or "WARN","at":"<ISO>","note":"the auditor's note"},"result":"open","placed":false. Strip the engine-only fields statProb/fairFlag/growth from legs if you like; keep modelProb, impliedProb, fairProb, edge, ev, odds.
+  Ids: Big Bet `<date>-big`, pairs `<date>-pair-1` / `<date>-pair-2`, parlays `<date>-nfl` / `<date>-nba` / `<date>-mlb`. If a document with that id already exists with placed=true, append `-2` instead; otherwise overwrite it.
+- `board/<date>`: {"date","createdAt","items":[the engine's board legs, each with experts/articleNote/why/hitRate/median/source/sharpSource and "result":"open"],"note":"one sentence on the day's board"}.
+- `games` documents from Step 1.
+
+Be honest: never call any bet a lock or guaranteed. Only use prices you actually found.
+
+End with a short summary: Big Bet (odds, win %, edge, value); each pair and parlay (legs, odds, joint chance, $10 payout); the top 5 board bets; the auditor's verdicts and what it caught; types skipped and why; and the model/stats lesson.
