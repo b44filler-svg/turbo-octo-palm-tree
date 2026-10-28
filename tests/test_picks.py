@@ -61,6 +61,12 @@ def test_stat_prob_weights_and_sample():
     assert p == pytest.approx(0.8) and n == 30
 
 
+def test_tiny_season_window_counts_less():
+    # 3/3 this season vs 20/70 last season: the 70 games should dominate.
+    p, _ = model.stat_prob({"season": [3, 3], "lastSeason": [20, 70]})
+    assert p < 0.5
+
+
 def test_thin_sample_leans_on_market():
     base = {"odds": -150, "sharpOdds": [-150, 130], "type": "prop over", "team": "X"}
     thin = model.score({**base, "hitRates": {"season": [3, 3]}})

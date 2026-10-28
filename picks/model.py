@@ -16,6 +16,9 @@ from . import oddsmath as om
 
 STAT_WEIGHTS = {"season": 0.35, "last10": 0.30, "last5": 0.15, "lastSeason": 0.20}
 FULL_SAMPLE = 20      # games of history before the stat model gets its full weight
+# Games a window needs before it gets its full weight: early in a season, a
+# 3-game "season" rate shouldn't outweigh last season's 70 games.
+WINDOW_FULL = {"season": 15, "last10": 10, "last5": 5, "lastSeason": 30}
 CAP, FLOOR = 0.92, 0.02
 # Closing lines are hard to beat by much; a model far from the no-vig market is
 # far more often wrong than right, so it may sit at most this far from it.
@@ -33,6 +36,7 @@ def stat_prob(hit_rates):
         if not hr or not hr[1]:
             continue
         hit, n = hr
+        w *= min(1.0, n / WINDOW_FULL[key])
         num += w * hit / n
         den += w
         if key in ("season", "lastSeason"):
