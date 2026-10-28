@@ -81,11 +81,23 @@ side for moneylines and spreads and the player's team for props; it is required
 side **first** in `sharpOdds`. Without a sharp price, give `fairProb` and
 `fairFlag: true`, or FanDuel's own two sides as `bookOdds` (flagged as thin).
 
+## Fetching prices
+
+`python3 -m picks.fetch --date YYYY-MM-DD --out <folder>` writes `candidates.json`
+straight from public feeds: Pinnacle's guest API for sharp two-sided prices,
+Action Network's odds feed for FanDuel's prices (book 69, the NJ board; confirm
+PA in the app) and true tip times, and ESPN for NBA game logs and injury
+reports. It drops players listed Out or questionable, ignores last season's
+games when a player's minutes moved more than 25% (`roleNote`), and lists
+teammates who are out (`teammatesOut`) so research can adjust for role
+changes. `fetch_report.json` has counts, injury drops and any feed failures.
+
 ## Run it
 
 ```bash
 python -m picks.build tests/fixtures/candidates.json --date 2026-10-27 --settings tests/fixtures/settings.json --out draft.json
 python -m picks.audit draft.json --settings tests/fixtures/settings.json
+python3 -m picks.fetch --date 2026-10-28 --out /tmp/picks   # live prices + stats
 python3 -m picks.selftest                           # quick check, no installs (the daily task runs this)
 python -m pytest -q                                 # full engine + auditor tests
 NODE_PATH=$(npm root -g) node tests/page_test.js    # app page in Chromium with a mocked database
