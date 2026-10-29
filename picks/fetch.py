@@ -2,9 +2,9 @@
 
 Sources (all public JSON, stdlib only):
   Pinnacle guest API   sharp two-sided prices: game lines and NBA/MLB props
-  Action Network feed  FanDuel prices (book 69) for game lines and NBA props,
+  Action Network feed  FanDuel prices (book 69) for game lines and NBA/NFL props,
                        plus true tip times
-  ESPN                 NBA game logs (this season and last) and injury reports
+  ESPN                 NBA and NFL game logs (this season and last) and injury reports
 
     python3 -m picks.fetch --date 2026-10-28 --out /tmp/picks/2026-10-28
 
@@ -29,7 +29,7 @@ ET = ZoneInfo("America/New_York")
 PINNACLE = "https://guest.api.arcadia.pinnacle.com/0.1"
 ACTION = "https://api.actionnetwork.com/web"
 ESPN = "https://site.api.espn.com/apis/site/v2/sports"
-ESPN_LOGS = "https://site.web.api.espn.com/apis/common/v3/sports/basketball/nba/athletes"
+ESPN_LOGS = "https://site.web.api.espn.com/apis/common/v3/sports"
 FANDUEL_BOOK = "69"
 LEAGUES = {"NBA": (487, "nba", "basketball/nba"),
            "MLB": (246, "mlb", "baseball/mlb"),
@@ -40,11 +40,30 @@ PROP_TYPES = {"NBA": {"core_bet_type_27_points": "Points",
                       "core_bet_type_26_assists": "Assists",
                       "core_bet_type_21_3fgm": "Threes Made",
                       "core_bet_type_85_points_rebounds_assists": "Pts & Rebs & Asts"},
-              "MLB": {"core_bet_type_37_strikeouts": "Strikeouts"}}
+              "MLB": {"core_bet_type_37_strikeouts": "Strikeouts"},
+              "NFL": {"core_bet_type_9_passing_yards": "Passing Yards",
+                      "core_bet_type_11_passing_tds": "Touchdown Passes",
+                      "core_bet_type_30_passing_attempts": "Pass Attempts",
+                      "core_bet_type_12_rushing_yards": "Rushing Yards",
+                      "core_bet_type_18_rushing_attempts": "Rush Attempts",
+                      "core_bet_type_15_receptions": "Receptions",
+                      "core_bet_type_16_receiving_yards": "Receiving Yards",
+                      "core_bet_type_65_interceptions": "Interceptions"}}
 STAT_KEYS = {"Points": ("PTS",), "Rebounds": ("REB",), "Assists": ("AST",),
-             "Threes Made": ("3PM",), "Pts & Rebs & Asts": ("PTS", "REB", "AST")}
+             "Threes Made": ("3PM",), "Pts & Rebs & Asts": ("PTS", "REB", "AST"),
+             # NFL: ESPN game-log field names
+             "Passing Yards": ("passingYards",), "Touchdown Passes": ("passingTouchdowns",),
+             "Pass Attempts": ("passingAttempts",), "Rushing Yards": ("rushingYards",),
+             "Rush Attempts": ("rushingAttempts",), "Receptions": ("receptions",),
+             "Receiving Yards": ("receivingYards",), "Interceptions": ("interceptions",)}
 STAT_ABBR = {"Points": "pts", "Rebounds": "reb", "Assists": "ast",
-             "Threes Made": "3s", "Pts & Rebs & Asts": "PRA"}
+             "Threes Made": "3s", "Pts & Rebs & Asts": "PRA",
+             "Passing Yards": "pass yds", "Touchdown Passes": "pass TDs", "Pass Attempts": "attempts",
+             "Rushing Yards": "rush yds", "Rush Attempts": "carries", "Receptions": "catches",
+             "Receiving Yards": "rec yds", "Interceptions": "INTs"}
+# ESPN paths per sport: (sport path, roster lists athletes in position groups,
+# offset from this year to last season's id: NBA seasons are named by the year they end)
+ESPN_SPORT = {"NBA": ("basketball/nba", False, 0), "NFL": ("football/nfl", True, -1)}
 ROLE_CHANGE = 0.25       # minutes moved this much: last season's games don't compare
 MIN_PROP_EV = -0.05      # props this far under the sharp price aren't worth listing
 SOURCE = "Action Network odds feed (FanDuel); sharp: Pinnacle"
@@ -240,6 +259,8 @@ def parse_gamelog(d):
     rows = []
     if not d or "labels" not in d:
         return rows
+    if "MIN" not in d["labels"]:
+        return parse_football_log(d)
     events = d.get("events", {})
     for st in d.get("seasonTypes", []):
         if "Regular Season" not in st.get("displayName", ""):
@@ -258,10 +279,31 @@ def parse_gamelog(d):
     return rows
 
 
+def parse_football_log(d):
+    """Regular-season games, newest first, keyed by ESPN's stat names
+    (passingYards, receptions, ...). Football logs have no minutes."""
+    rows = []
+    events = d.get("events", {})
+    for st in d.get("seasonTypes", []):
+        if "Regular Season" not in st.get("displayName", ""):
+            continue
+        for cat in st.get("categories", []):
+            for e in cat.get("events", []):
+                row = {"date": events.get(e["eventId"], {}).get("gameDate", "")}
+                for name, v in zip(d.get("names", []), e["stats"]):
+                    try:
+                        row.setdefault(name, float(str(v).replace(",", "")))
+                    except ValueError:
+                        continue
+                rows.append(row)
+    rows.sort(key=lambda r: r["date"], reverse=True)
+    return rows
+
+
 def normal_minutes(rows):
     """Drop cameo games (under 60% of the player's median minutes)."""
-    if not rows:
-        return []
+    if not rows or "MIN" not in rows[0]:
+        return rows or []
     med = statistics.median(r["MIN"] for r in rows)
     return [r for r in rows if r["MIN"] > 0 and r["MIN"] >= 0.6 * med]
 
@@ -271,7 +313,7 @@ def hit_rates(cur, last, stat, line, side):
     keys = STAT_KEYS[stat]
 
     def val(r):
-        return sum(r[k] for k in keys)
+        return sum(r.get(k, 0.0) for k in keys)
 
     def hits(rows):
         won = sum(1 for r in rows if (val(r) > line if side == "over" else val(r) < line))
@@ -299,7 +341,7 @@ def hit_rates(cur, last, stat, line, side):
 
 def role_change(cur, last):
     """'minutes 27 -> 14' when this season's role differs from last season's."""
-    if len(cur) < 2 or not last:
+    if len(cur) < 2 or not last or "MIN" not in cur[0]:
         return None
     now, before = statistics.median(r["MIN"] for r in cur), statistics.median(r["MIN"] for r in last)
     if before and abs(now - before) / before > ROLE_CHANGE:
@@ -330,14 +372,19 @@ def injury_block(info):
     note = info["note"].lower()
     if info["status"] == "Out" or "out for" in note or "ruled out" in note:
         return "out"
-    if re.search(r"\b(questionable|doubtful|game-time)\b", note):
+    if info["status"] in ("Questionable", "Doubtful") or re.search(r"\b(questionable|doubtful|game-time)\b", note):
         return "questionable"
     return None
 
 
 # ---------- candidates ----------
 
-def prop_candidates(pin_props, fd_props, tips, logs, injuries, team_out):
+def is_star(stat, line):
+    return ((stat == "Points" and line >= 22.5) or (stat == "Passing Yards" and line >= 250.5)
+            or (stat in ("Rushing Yards", "Receiving Yards") and line >= 69.5))
+
+
+def prop_candidates(pin_props, fd_props, tips, logs, injuries, team_out, sport="NBA"):
     cands, dropped = [], []
     for k, fd in fd_props.items():
         if k not in pin_props or "over" not in fd or "under" not in fd:
@@ -361,12 +408,12 @@ def prop_candidates(pin_props, fd_props, tips, logs, injuries, team_out):
             fair = om.fair_prob(sharp)
             if om.ev(fair, odds) < MIN_PROP_EV:
                 continue
-            c = {"sport": "NBA" if stat in STAT_KEYS else "MLB", "game": game,
+            c = {"sport": sport, "game": game,
                  "start": to_et(iso), "startISO": to_z(iso),
                  "pick": f"{fd['player']} {side.title()} {line:g} {stat}", "market": stat,
                  "type": "prop " + side, "team": fd["team"], "player": fd["player"],
                  "prices": {"FanDuel": odds}, "sharpOdds": sharp, "sharpSource": "Pinnacle",
-                 "source": SOURCE, "star": stat == "Points" and line >= 22.5, "adjust": 0.0}
+                 "source": SOURCE, "star": is_star(stat, line), "adjust": 0.0}
             lg = logs.get(k[0])
             if lg and stat in STAT_KEYS:
                 hr, med, role = hit_rates(lg["cur"], lg["last"], stat, line, side)
@@ -403,26 +450,31 @@ def line_candidates(legs):
     return out
 
 
-def nba_logs(players, teams, failures):
+def espn_logs(sport, players, teams, failures):
     """{normalized name: {"cur": rows, "last": rows}} for players on these teams."""
-    listing = get(f"{ESPN}/basketball/nba/teams", failures) or {}
+    path, grouped, offset = ESPN_SPORT[sport]
+    listing = get(f"{ESPN}/{path}/teams", failures) or {}
     ids = {t["team"]["displayName"]: t["team"]["id"]
            for t in listing.get("sports", [{}])[0].get("leagues", [{}])[0].get("teams", [])}
     pool = ThreadPoolExecutor(12)
-    rosters = pool.map(lambda t: get(f"{ESPN}/basketball/nba/teams/{ids[t]}/roster", failures),
+    rosters = pool.map(lambda t: get(f"{ESPN}/{path}/teams/{ids[t]}/roster", failures),
                        [t for t in teams if t in ids])
     athlete = {}
     for r in rosters:
-        for a in (r or {}).get("athletes", []):
+        athletes = (r or {}).get("athletes", [])
+        if grouped:
+            athletes = [a for g in athletes for a in g.get("items", [])]
+        for a in athletes:
             athlete[norm(a["fullName"])] = a["id"]
-    last_season = datetime.now(ET).year if datetime.now(ET).month >= 7 else datetime.now(ET).year - 1
+    now = datetime.now(ET)
+    last_season = (now.year if now.month >= 7 else now.year - 1) + offset
 
     def one(name):
         aid = athlete.get(name)
         if not aid:
             return name, None
-        cur = parse_gamelog(get(f"{ESPN_LOGS}/{aid}/gamelog"))
-        last = parse_gamelog(get(f"{ESPN_LOGS}/{aid}/gamelog?season={last_season}"))
+        cur = parse_gamelog(get(f"{ESPN_LOGS}/{path}/athletes/{aid}/gamelog"))
+        last = parse_gamelog(get(f"{ESPN_LOGS}/{path}/athletes/{aid}/gamelog?season={last_season}"))
         return name, {"cur": cur, "last": last}
 
     return {n: v for n, v in pool.map(one, players) if v}
@@ -464,9 +516,10 @@ def fetch(date, sports):
                 fd.update(fanduel_props(feed, stat))
         injuries, team_out = parse_injuries(get(f"{ESPN}/{espn}/injuries", failures))
         logs = {}
-        if sport == "NBA":
-            logs = nba_logs({k[0] for k in fd}, {v["team"] for v in fd.values() if v["team"]}, failures)
-        props, dropped = prop_candidates(pinnacle_props(pin), fd, tip_times(board), logs, injuries, team_out)
+        if sport in ESPN_SPORT:
+            logs = espn_logs(sport, {k[0] for k in fd}, {v["team"] for v in fd.values() if v["team"]}, failures)
+        props, dropped = prop_candidates(pinnacle_props(pin), fd, tip_times(board), logs, injuries,
+                                         team_out, sport)
         cands += props
         rep.update(propLegs=len(props), playersWithLogs=len(logs), injuryDrops=dropped)
     report["candidates"] = len(cands)

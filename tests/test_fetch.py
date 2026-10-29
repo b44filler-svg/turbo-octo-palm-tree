@@ -132,3 +132,40 @@ def test_parse_injuries():
         {"status": "Day-To-Day", "shortComment": "probable", "athlete": {"displayName": "Aaron Wiggins"}}]}]}
     players, out = fetch.parse_injuries(feed)
     assert out == {"Atlanta Hawks": ["Trae Young"]} and players["aaronwiggins"]["status"] == "Day-To-Day"
+
+
+FOOTBALL_LOG = {
+    "labels": ["CMP", "ATT", "YDS", "TD", "CAR", "YDS"],
+    "names": ["completions", "passingAttempts", "passingYards", "passingTouchdowns",
+              "rushingAttempts", "rushingYards"],
+    "events": {"1": {"gameDate": "2026-10-12T17:00Z"}, "2": {"gameDate": "2026-10-19T17:00Z"}},
+    "seasonTypes": [{"displayName": "2026 Regular Season", "categories": [{"events": [
+        {"eventId": "1", "stats": ["20", "31", "1,204", "2", "3", "12"]},
+        {"eventId": "2", "stats": ["25", "40", "301", "3", "1", "-2"]}]}]},
+                    {"displayName": "2026 Preseason", "categories": [{"events": [
+                        {"eventId": "1", "stats": ["1", "1", "5", "0", "0", "0"]}]}]}],
+}
+
+
+def test_football_log_uses_stat_names_and_skips_preseason():
+    rows = fetch.parse_gamelog(FOOTBALL_LOG)
+    assert len(rows) == 2 and rows[0]["date"].startswith("2026-10-19")
+    assert rows[0]["passingYards"] == 301 and rows[1]["passingYards"] == 1204
+    assert rows[0]["rushingYards"] == -2       # the second YDS column is rushing, not passing
+
+
+def test_football_hit_rates_without_minutes():
+    rows = fetch.parse_gamelog(FOOTBALL_LOG)
+    assert fetch.normal_minutes(rows) == rows
+    hr, med, role = fetch.hit_rates(rows, [], "Touchdown Passes", 1.5, "over")
+    assert hr == {"season": [2, 2]} and role is None and "pass TDs" in med
+
+
+def test_nfl_questionable_status_is_blocked():
+    assert fetch.injury_block({"status": "Questionable", "note": "Hamstring"}) == "questionable"
+    assert fetch.injury_block({"status": "Doubtful", "note": ""}) == "questionable"
+
+
+def test_star_flags():
+    assert fetch.is_star("Passing Yards", 265.5) and fetch.is_star("Receiving Yards", 74.5)
+    assert not fetch.is_star("Receptions", 6.5) and not fetch.is_star("Points", 12.5)

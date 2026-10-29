@@ -90,8 +90,10 @@ side **first** in `sharpOdds`. Without a sharp price, give `fairProb` and
 `python3 -m picks.fetch --date YYYY-MM-DD --out <folder>` writes `candidates.json`
 straight from public feeds: Pinnacle's guest API for sharp two-sided prices,
 Action Network's odds feed for FanDuel's prices (book 69, the NJ board; confirm
-PA in the app) and true tip times, and ESPN for NBA game logs and injury
-reports. It drops players listed Out or questionable, ignores last season's
+PA in the app) and true tip times, and ESPN for NBA and NFL game logs and injury
+reports, plus NFL props (passing, rushing and receiving yards, receptions,
+pass TDs, attempts, interceptions) with ESPN football game logs. It drops
+players listed Out, Doubtful or questionable, ignores last season's
 games when a player's minutes moved more than 25% (`roleNote`), and lists
 teammates who are out (`teammatesOut`) so research can adjust for role
 changes. `fetch_report.json` has counts, injury drops and any feed failures.
