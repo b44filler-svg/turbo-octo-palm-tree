@@ -20,6 +20,11 @@ research (web) ──► candidates.json ──► picks.build ──► draft.j
 | **Power Pair** | 2-leg parlay | Strong legs that are too juiced alone | each leg 60%+, joint 42%+, value +2%+, pays 1.9x-3.6x; no leg reused from the Big Bet |
 | **3-leg parlay** | One per sport | Closest to a lock that still pays | legs -500 to -150, max one leg with negative edge, $18+ per $10, value >= 0 |
 
+Every multi-leg ticket (pairs, parlays, boosts) uses one leg per game: FanDuel
+only takes same-game legs as a Same Game Parlay at its own price, so a product of
+the leg odds would promise a payout that isn't on offer. `picks.audit` fails any
+ticket that breaks this.
+
 **Why rank by Kelly growth?** Expected log growth at a quarter of the Kelly
 stake is one number that rises with both a higher win chance and a bigger
 payout. A +150 bet with a 4-point edge and a -200 bet with a 3-point edge can

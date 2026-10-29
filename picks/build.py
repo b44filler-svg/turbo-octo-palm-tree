@@ -29,7 +29,7 @@ from . import oddsmath as om
 from . import rules
 from .model import score
 
-SAME_GAME_PENALTY = 0.97   # per same-game pair; FanDuel reprices correlated SGPs
+SAME_GAME_PENALTY = 0.97   # per same-game pair; only old tickets have these (combo_ok rejects them)
 
 BIG = dict(min_prob=0.60, min_edge=0.025, min_ev=0.03, min_odds=-300, max_odds=150)
 PAIR = dict(min_leg_prob=0.60, min_leg_edge=0.0, min_joint=0.42,
@@ -56,7 +56,9 @@ def joint(legs):
 
 
 def combo_ok(legs):
-    return not rules.ticket_conflicts(legs)
+    # Same-game legs only go on a FanDuel Same Game Parlay, which has its own
+    # (lower) price, so the product of the leg odds would overstate the payout.
+    return not rules.ticket_conflicts(legs) and rules.same_game_pairs(legs) == 0
 
 
 def boosted_dec(dec, pct):

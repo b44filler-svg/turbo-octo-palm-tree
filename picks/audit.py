@@ -158,6 +158,9 @@ def check_ticket(tid, t, never_against, now=None, books=None):
         check_leg(r, t["backup"], "backup", never_against, now, legacy, books)
     for i, j, why in rules.ticket_conflicts(legs):
         r.fail("conflict", f"legs {i + 1} and {j + 1}: {why}")
+    if not legacy and len(legs) > 1 and rules.same_game_pairs(legs):
+        r.fail("same-game", "two legs from one game: the book only takes them as a Same Game Parlay, "
+                            "at its own price, so the payout shown isn't on offer")
     if t.get("sport") and t.get("sport") != "Mix" and kind == "parlay3":
         other = {l.get("sport") for l in legs} - {t["sport"]}
         if other:

@@ -336,6 +336,22 @@ def test_same_game_matches_across_spellings():
     assert rules.same_game_pairs([a, b]) == 1
 
 
+def test_multi_leg_tickets_never_share_a_game(built):
+    tickets = built["pairs"] + list(built["parlays"].values()) + built["boosts"]
+    assert tickets
+    for t in tickets:
+        assert rules.same_game_pairs(t["legs"]) == 0, t["legs"]
+
+
+def test_audit_catches_same_game_legs(built):
+    bad = copy.deepcopy(built)
+    p = bad["pairs"][0]
+    a = p["legs"][0]
+    p["legs"][1] = {**a, "pick": "Someone Else Over 1.5 Assists", "player": "Someone Else",
+                    "market": "Assists", "type": "prop over"}
+    assert "same-game" in codes(audit.audit(bad, EAGLES, NOW))
+
+
 def test_conflict_details():
     g = {"game": "Bulls @ Heat", "sport": "NBA"}
     assert rules.conflict({**g, "type": "team total over", "team": "Heat", "pick": "a"},
