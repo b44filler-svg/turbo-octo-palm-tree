@@ -518,3 +518,30 @@ def test_lean_bars_match_builder():
         assert audit.LEAN_PARLAY[name] == build.LEAN_PARLAY[name]
     for name in audit.LONGSHOT:
         assert audit.LONGSHOT[name] == build.LONGSHOT[name]
+
+
+def test_sharp_price_keeps_model_within_4_points():
+    # Hot hit rates can't push the model more than 4 pts past a Pinnacle price.
+    c = {"odds": -110, "sharpOdds": [105, -125], "sharpSource": "Pinnacle", "type": "prop over", "team": "X",
+         "hitRates": {"season": [9, 10], "last10": [9, 10], "last5": [5, 5], "lastSeason": [60, 70]}}
+    s = model.score(c)
+    assert s["fairFlag"] is False
+    assert s["modelProb"] <= s["fairProb"] + model.SHARP_MAX_DEVIATION + 1e-9
+    # A thin (FanDuel-only) price keeps the wider 7-pt leash.
+    thin = model.score({k: v for k, v in c.items() if k not in ("sharpOdds", "sharpSource")} | {"bookOdds": [105, -125]})
+    assert thin["fairFlag"] is True
+    assert s["modelProb"] < thin["modelProb"] <= thin["fairProb"] + model.MAX_DEVIATION + 1e-9
+
+
+def test_audit_catches_model_too_far_from_sharp_price(built):
+    t = copy.deepcopy(built)
+    leg = next(l for l in t["board"] if l.get("fairFlag") is False)
+    leg["modelProb"] = round(leg["fairProb"] + 0.06, 3)
+    leg["edge"] = round(leg["modelProb"] - leg["impliedProb"], 3)
+    leg["ev"] = round(leg["modelProb"] * (1 + (100 / abs(leg["odds"]) if leg["odds"] < 0 else leg["odds"] / 100)) - 1, 3)
+    fails = [r for r in audit.audit(t, EAGLES, None) if r.status == "FAIL"]
+    assert any(i["code"] == "sharp-leash" for r in fails for i in r.items)
+
+
+def test_audit_sharp_leash_is_its_own_number():
+    assert "0.041" in Path(audit.__file__).read_text()

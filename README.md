@@ -42,8 +42,7 @@ land side by side, which is the "high win % *and* high payout" trade-off.
    app's learning record and rises when results trail the model.
 4. **Adjustments**: prop unders +1.5 pts, star overs -1 pt (public money bias),
    matchup `adjust` ±5, expert/news `newsAdjust` ±3, line moved against -2.
-5. **Guard rails**: the model may sit at most **7 points** from the no-vig
-   market (a model far from the market is usually wrong), and never above 92%.
+5. **Guard rails**: the model may sit at most **4 points** from a sharp two-sided no-vig price (7 from a thin, FanDuel-only one; picking the biggest edges out of dozens overstates them), and never above 92%.
 
 ## The checks
 

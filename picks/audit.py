@@ -98,7 +98,10 @@ def check_leg(r, l, where, never_against, now, legacy=False, books=None):
             r.fail("edge-math", f"{where}: edge {l['edge']} but modelProb - implied = {p - imp:.3f}")
         if p - imp < -EPS:
             r.warn("negative-edge", f"{where}: priced worse than the model's estimate (edge {p - imp:+.3f})")
-        if l.get("fairProb") is not None and abs(p - l["fairProb"]) > 0.071:
+        # Own copy of the leash (not imported): 4 pts from a sharp two-sided price.
+        if l.get("fairProb") is not None and l.get("fairFlag") is False and abs(p - l["fairProb"]) > 0.041:
+            r.fail("sharp-leash", f"{where}: model {p:.3f} is {abs(p - l['fairProb']):.3f} from the sharp no-vig price {l['fairProb']:.3f}; max 0.04")
+        elif l.get("fairProb") is not None and abs(p - l["fairProb"]) > 0.071:
             r.warn("far-from-market", f"{where}: model {p:.2f} is {abs(p - l['fairProb']):.2f} from the no-vig market {l['fairProb']:.2f}; double-check the stats")
     if l.get("fairProb") is None and not legacy:
         r.fail("no-fair", f"{where}: no market fair price; stats-only legs can't post")

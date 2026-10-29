@@ -23,6 +23,12 @@ CAP, FLOOR = 0.92, 0.02
 # Closing lines are hard to beat by much; a model far from the no-vig market is
 # far more often wrong than right, so it may sit at most this far from it.
 MAX_DEVIATION = 0.07
+# Tighter leash when the fair price comes from a real two-sided sharp market
+# (e.g. Pinnacle). Scanning dozens of props and keeping the biggest model edges
+# overstates those edges (the "optimizer's curse", Smith & Winkler 2006), and
+# on 10/28 twelve Pinnacle-priced singles the model put ~6-7 pts above the
+# market hit 6 of 12 (50%), right at Pinnacle's ~51%, not the model's ~59%.
+SHARP_MAX_DEVIATION = 0.04
 
 
 def stat_prob(hit_rates):
@@ -107,7 +113,8 @@ def score(c, shrink=0.5):
     if c.get("lineMovedAgainst"):
         p -= 0.02
     if fair is not None:
-        p = max(fair - MAX_DEVIATION, min(fair + MAX_DEVIATION, p))
+        lim = MAX_DEVIATION if flagged else SHARP_MAX_DEVIATION
+        p = max(fair - lim, min(fair + lim, p))
     p = max(FLOOR, min(CAP, p))
 
     p = round(p, 3)   # every stored number is derived from the stored modelProb
