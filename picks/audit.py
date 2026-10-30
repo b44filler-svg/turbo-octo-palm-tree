@@ -160,7 +160,7 @@ def check_leg(r, l, where, never_against, now, legacy=False, books=None):
         mv = f * d - 1
         if l.get("marketEv") is not None and abs(l["marketEv"] - mv) > TOL_EV:
             r.fail("market-math", f"{where}: marketEv {l['marketEv']} but sharp fair x payout - 1 = {mv:+.3f}")
-        if mv < MARKET_FLOOR - EPS:
+        if mv < MARKET_FLOOR:
             r.fail("overpriced", f"{where}: priced {mv:+.1%} against the sharp market (floor {MARKET_FLOOR:+.0%})")
     t = str(l.get("type", "")).lower()
     if t not in rules.NEUTRAL and not l.get("team"):

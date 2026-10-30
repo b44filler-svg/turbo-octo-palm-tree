@@ -58,8 +58,7 @@ SGP = dict(min_joint=0.12, min_odds=-300, max_odds=250, pool=12, min_leg_edge=-0
 # app is never empty. Still positive value, but a lower bar, and labeled as such.
 # Leans must be worth at least break-even by the sharp market, like everything
 # else that posts; the model's extra value is what has been unreliable.
-LEAN_BIG = dict(min_prob=0.55, min_edge=0.005, min_ev=0.005, min_odds=-400, max_odds=200, allow_thin=True,
-                min_market_ev=0.0)
+LEAN_BIG = dict(min_prob=0.55, min_edge=0.005, min_ev=0.005, min_odds=-400, max_odds=200, min_market_ev=0.0)
 LEAN_PAIR = dict(min_leg_prob=0.55, min_leg_edge=-0.005, min_joint=0.35,
                  min_dec=1.7, max_dec=4.0, min_ev=0.005, count=1, min_market_ev=0.0)
 LEAN_PARLAY = dict(min_payout10=15.0, min_ev=0.0, min_leg_edge=-0.005, soft_leg_edge=-0.015,
@@ -91,10 +90,10 @@ def market_ok(l):
 
 
 def market_clears(t, cfg):
-    """Ticket-level market check. A ticket with a thin leg has no market value,
-    which only a lean bar (one that allows negative market value) accepts."""
+    """Ticket-level market check on the exact value. A ticket with a thin leg
+    has no market value, so it never clears (every bar is break-even or more)."""
     if t.get("marketEv") is None:
-        return cfg["min_market_ev"] < 0
+        return False
     return t["_marketEvExact"] >= cfg["min_market_ev"]
 
 
@@ -243,8 +242,7 @@ def build_big(legs, date, cfg=BIG):
     c = [l for l in legs
          if l["modelProb"] >= cfg["min_prob"] and l["edge"] >= cfg["min_edge"]
          and l["ev"] >= cfg["min_ev"] and cfg["min_odds"] <= l["odds"] <= cfg["max_odds"]
-         and (cfg.get("allow_thin") or not l.get("fairFlag"))
-         and market_ok(l) and (mev(l) >= cfg["min_market_ev"] if sharp(l) else cfg["min_market_ev"] < 0)]
+         and sharp(l) and mev(l) >= cfg["min_market_ev"]]
     if not c:
         return None
     best = max(c, key=lambda l: l["growth"])

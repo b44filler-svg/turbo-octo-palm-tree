@@ -1247,11 +1247,13 @@ function renderBoosts(){
 // A boost multiplies the winnings, not the stake.
 const boosted = (d, pct) => 1 + (d - 1) * (1 + pct);
 const PCTS = [0, 0.25, 0.30, 0.50];
-let bbGame = "", bbPicked = new Set(), bbPrice = {}, bbPct = {};
+let bbGame = "", bbPicked = new Set(), bbPrice = {}, bbPct = {}, builderStale = false;
+// A live update skipped while a price was being typed is drawn once typing stops.
+document.addEventListener("focusout", e=>{ const box = $("builderBox"); if(builderStale && box && box.contains(e.target)) setTimeout(()=>{ if(!box.contains(document.activeElement)) renderBuilder(); }, 0); });
 
 // American odds as typed on a phone: "+450", "450", "-120" or "−120" (a typographic minus). Anything else: null.
 function parseAm(txt){
-  const t = String(txt||"").trim().replace(/[\u2212\u2013\u2014]/g,"-").replace(/\s+/g,"");
+  const t = String(txt||"").trim().replace(/[\u2212\u2013\u2014]/g,"-").replace(/[\s,]+/g,"");
   if(!/^[+-]?\d{3,5}$/.test(t)) return null;
   const a = Number(t);
   return Math.abs(a) >= 100 ? a : null;
@@ -1298,7 +1300,8 @@ function calcRow(key, win){
 function renderBuilder(force){
   const box = $("builderBox"); if(!box) return;
   // A live update mustn't wipe out a price being typed (and close the phone keyboard).
-  if(!force && box.contains(document.activeElement) && document.activeElement.tagName === "INPUT") return;
+  if(!force && box.contains(document.activeElement) && document.activeElement.tagName === "INPUT"){ builderStale = true; return; }
+  builderStale = false;
   box.replaceChildren();
   const m = market && dkey(market) === todayET() ? market : null;
   const head = el("div","boost-head");
