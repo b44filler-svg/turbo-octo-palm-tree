@@ -53,7 +53,13 @@ const updates = {
   [`${today}-0741-picks`]: { at: stamp, date: today, kind: "picks", title: "Today's picks are up", detail: "Big Bet, 2 pairs, NBA and MLB parlays." },
   [`${today}-1143-check`]: { at: stamp, date: today, kind: "check", title: "11:43 AM check: all clear", detail: "No injury news on any leg." },
 };
-const DATA = { parlays, games, board, settings, model, changelog, updates };
+// Today's FanDuel-vs-Pinnacle price snapshot, with start times moved to tonight.
+const marketFix = JSON.parse(fs.readFileSync(path.join(__dirname, "fixtures", "market.json"), "utf8"));
+const later = new Date(Date.now() + 6 * 3600e3).toISOString();
+const reStart = l => ({ ...l, startISO: later });
+const market = { [today]: { ...marketFix, date: today, at: stamp, legs: marketFix.legs.map(reStart),
+  sgp: marketFix.sgp.map(g => ({ ...g, startISO: later, legs: g.legs.map(reStart) })) } };
+const DATA = { parlays, games, board, settings, model, changelog, updates, market };
 
 function mock(DATA) {
   const writes = [];
@@ -143,6 +149,22 @@ function mock(DATA) {
     }));
     if (bq.tickets < 1 || !/Without the boost/.test(bq.math)) fail(`${width}px Boosts tab: ${JSON.stringify(bq)}`);
     if (bq.stakes.some(s => Number(s.slice(1)) > 25)) fail(`${width}px boost stakes exceed the $25 cap: ${bq.stakes}`);
+    // Boost builder: a build per game with its break-even line, and the verdict follows the typed price
+    const bb = await page.evaluate(() => ({
+      builds: document.querySelectorAll("#builderBox .bb").length,
+      need: document.querySelectorAll("#builderBox .bb-need").length,
+      picks: document.querySelectorAll("#builderBox .pick-list input").length,
+    }));
+    if (bb.builds < 2 || bb.need < 1 || bb.picks < 2) fail(`${width}px boost builder: ${JSON.stringify(bb)}`);
+    await page.locator("#builderBox .calc input").first().fill("+2000");
+    const good = await page.locator("#builderBox .verdict").first().textContent();
+    await page.locator("#builderBox .calc input").first().fill("+150");
+    const bad = await page.locator("#builderBox .verdict").first().textContent();
+    if (!/Good value/.test(good) || !/Overpriced/.test(bad)) fail(`${width}px verdicts: "${good}" / "${bad}"`);
+    await page.locator("#builderBox .pick-list input").nth(0).check();
+    await page.locator("#builderBox .pick-list input").nth(1).check();
+    const own = await page.evaluate(() => [...document.querySelectorAll("#builderBox .bb")].pop().querySelectorAll(".bb-need").length);
+    if (own !== 1) fail(`${width}px own-parlay checker didn't show the break-even line`);
     await overflow("boosts");
     if (process.env.SHOTS) await page.screenshot({ path: path.join(process.env.SHOTS, `boosts-${width}.png`), fullPage: true });
     for (const tab of ["calendar", "profit", "history"]) {

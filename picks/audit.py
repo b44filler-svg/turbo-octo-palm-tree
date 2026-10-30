@@ -22,16 +22,21 @@ EPS = 0.0006   # stored numbers are rounded to 3 places; thresholds allow for th
 
 # Thresholds, written out again here on purpose (tests check they match picks.build).
 # If someone loosens the builder, this checker still holds the line.
-BIG = dict(min_prob=0.60, min_edge=0.025, min_ev=0.03, min_odds=-300, max_odds=150)
-PAIR = dict(min_leg_prob=0.60, min_joint=0.42, min_dec=1.9, max_dec=3.6, min_ev=0.02)
-PARLAY = dict(min_payout10=18.0, min_ev=0.0, min_odds=-500, max_odds=-150)
-BOARD = dict(min_prob=0.50)
+MARKET_FLOOR = -0.02          # no leg priced more than 2% worse than the sharp no-vig price
+SHARP_LEASH = 0.026           # model vs sharp no-vig price (0.025 plus rounding)
+BIG = dict(min_prob=0.60, min_edge=0.025, min_ev=0.03, min_odds=-300, max_odds=150, min_market_ev=0.0)
+PAIR = dict(min_leg_prob=0.60, min_joint=0.42, min_dec=1.9, max_dec=3.6, min_ev=0.02, min_market_ev=0.0)
+PARLAY = dict(min_payout10=18.0, min_ev=0.0, min_odds=-500, max_odds=-150, min_market_ev=0.0)
+BOARD = dict(min_prob=0.50, min_market_ev=0.0)
 BOOST_MIN_JOINT = 0.25
+BOOST_MIN_MARKET_EV = 0.0
 # The lower "lean" bar, used only when nothing clears the full one (still positive value).
-LEAN_BIG = dict(min_prob=0.55, min_edge=0.005, min_ev=0.005, min_odds=-400, max_odds=200)
-LEAN_PAIR = dict(min_leg_prob=0.55, min_joint=0.35, min_dec=1.7, max_dec=4.0, min_ev=0.005)
-LEAN_PARLAY = dict(min_payout10=15.0, min_ev=0.0, min_odds=-600, max_odds=150, min_leg_edge=-0.005)
-LONGSHOT = dict(min_prob=0.35, min_ev=0.03, min_odds=120)
+LEAN_BIG = dict(min_prob=0.55, min_edge=0.005, min_ev=0.005, min_odds=-400, max_odds=200, min_market_ev=-0.02)
+LEAN_PAIR = dict(min_leg_prob=0.55, min_joint=0.35, min_dec=1.7, max_dec=4.0, min_ev=0.005, min_market_ev=-0.02)
+LEAN_PARLAY = dict(min_payout10=15.0, min_ev=0.0, min_odds=-600, max_odds=150, min_leg_edge=-0.005,
+                   min_market_ev=-0.02)
+LONGSHOT = dict(min_prob=0.35, min_ev=0.03, min_odds=120, min_market_ev=0.0)
+SGP_MIN_JOINT = 0.12
 LEGS_BY_KIND = {"big": 1, "pair": 2, "parlay3": 3}
 BOOST_LEGS = (1, 4)   # a boost ticket may have 1 to 4 legs
 REQUIRED = ("sport", "game", "pick", "market", "type", "odds", "modelProb", "source")
@@ -61,6 +66,40 @@ def sgn(x):
 
 def american(d):
     return round((d - 1) * 100) if d >= 2 else round(-100 / (d - 1))
+
+
+def power_fair(odds):
+    """No-vig chance of the first side, power method, solved here by bisection
+    (its own code, not oddsmath's): find k with sum(implied_i ** k) = 1."""
+    imps = [1 / dec(o) for o in odds]
+    lo, hi = 0.5, 3.0
+    for _ in range(80):
+        k = (lo + hi) / 2
+        if sum(p ** k for p in imps) > 1:
+            lo = k
+        else:
+            hi = k
+    return imps[0] ** ((lo + hi) / 2)
+
+
+def sharp_fair(l):
+    """(fair chance from the leg's own sharp prices, or None)."""
+    if l.get("fairFlag"):
+        return None
+    so = l.get("sharpOdds") or []
+    if len(so) < 2:
+        # A sourced fair estimate without both raw prices: same as the builder.
+        return l.get("fairProb") if l.get("fairFlag") is False else None
+    try:
+        return power_fair(so)
+    except (TypeError, ValueError, ZeroDivisionError):
+        return None
+
+
+def market_value(l):
+    """Value by the sharp market alone, recomputed from the raw prices."""
+    f, d = sharp_fair(l), safe_dec(l.get("odds"))
+    return None if f is None or d is None else f * d - 1
 
 
 class Report:
@@ -98,13 +137,22 @@ def check_leg(r, l, where, never_against, now, legacy=False, books=None):
             r.fail("edge-math", f"{where}: edge {l['edge']} but modelProb - implied = {p - imp:.3f}")
         if p - imp < -EPS:
             r.warn("negative-edge", f"{where}: priced worse than the model's estimate (edge {p - imp:+.3f})")
-        # Own copy of the leash (not imported): 4 pts from a sharp two-sided price.
-        if l.get("fairProb") is not None and l.get("fairFlag") is False and abs(p - l["fairProb"]) > 0.041:
-            r.fail("sharp-leash", f"{where}: model {p:.3f} is {abs(p - l['fairProb']):.3f} from the sharp no-vig price {l['fairProb']:.3f}; max 0.04")
+        # Own copy of the leash (not imported): 2.5 pts from a sharp two-sided price.
+        if l.get("fairProb") is not None and l.get("fairFlag") is False and abs(p - l["fairProb"]) > SHARP_LEASH:
+            r.fail("sharp-leash", f"{where}: model {p:.3f} is {abs(p - l['fairProb']):.3f} from the sharp no-vig price {l['fairProb']:.3f}; max 0.025")
         elif l.get("fairProb") is not None and abs(p - l["fairProb"]) > 0.071:
             r.warn("far-from-market", f"{where}: model {p:.2f} is {abs(p - l['fairProb']):.2f} from the no-vig market {l['fairProb']:.2f}; double-check the stats")
     if l.get("fairProb") is None and not legacy:
         r.fail("no-fair", f"{where}: no market fair price; stats-only legs can't post")
+    f = sharp_fair(l)
+    if f is not None and not legacy:
+        if l.get("fairProb") is not None and abs(l["fairProb"] - f) > 0.003:
+            r.fail("fair-math", f"{where}: fairProb {l['fairProb']} but the sharp prices {l.get('sharpOdds')} make {f:.3f}")
+        mv = f * d - 1
+        if l.get("marketEv") is not None and abs(l["marketEv"] - mv) > TOL_EV:
+            r.fail("market-math", f"{where}: marketEv {l['marketEv']} but sharp fair x payout - 1 = {mv:+.3f}")
+        if mv < MARKET_FLOOR - EPS:
+            r.fail("overpriced", f"{where}: priced {mv:+.1%} against the sharp market (floor {MARKET_FLOOR:+.0%})")
     t = str(l.get("type", "")).lower()
     if t not in rules.NEUTRAL and not l.get("team"):
         r.fail("missing-team", f"{where}: non-total leg needs `team` so the loyalty rule can be checked")
@@ -196,6 +244,20 @@ def check_ticket(tid, t, never_against, now=None, books=None):
         if t.get("tier") not in (None, "lean"):
             r.fail("bad-tier", f"unknown tier {t.get('tier')!r}")
         big_c, pair_c, parlay_c = (LEAN_BIG, LEAN_PAIR, LEAN_PARLAY) if lean else (BIG, PAIR, PARLAY)
+        floor = {"big": big_c, "pair": pair_c, "parlay3": parlay_c}.get(kind, {}).get("min_market_ev")
+        if kind == "boost":
+            floor = BOOST_MIN_MARKET_EV
+        fairs = [sharp_fair(l) for l in legs]
+        if None in fairs:
+            if floor is not None and floor >= 0:
+                r.fail("market-value", "a full-tier ticket needs a sharp price on every leg")
+        else:
+            mwin = math.prod(fairs)
+            me = mwin * d - 1
+            if t.get("marketEv") is not None and abs(t["marketEv"] - me) > TOL_EV:
+                r.fail("market-math", f"marketEv {t['marketEv']} but sharp chances x payout - 1 = {me:+.3f}")
+            if floor is not None and me < floor - EPS:
+                r.fail("market-value", f"worth {me:+.1%} by the sharp market alone; needs {floor:+.1%}")
         if kind == "big":
             l, o = legs[0], float(legs[0]["odds"])
             if l["modelProb"] < big_c["min_prob"] - EPS or l["modelProb"] - 1 / d < big_c["min_edge"] - EPS:
@@ -233,6 +295,41 @@ def check_ticket(tid, t, never_against, now=None, books=None):
     return r
 
 
+def check_sgp(r, t, where, never_against, now, books):
+    """Same Game Parlay builds: one game, one book, real math, honest prices."""
+    legs = t.get("legs") or []
+    if len(legs) != 3:
+        r.fail("sgp-legs", f"{where}: needs 3 legs, has {len(legs)}")
+        return
+    for i, l in enumerate(legs):
+        check_leg(r, l, f"{where} leg {i + 1}", never_against, now, books=books)
+    if len({rules.game_key(l.get("game", "")) for l in legs}) != 1:
+        r.fail("sgp-games", f"{where}: legs must all come from one game")
+    if len({l.get("book") for l in legs}) != 1:
+        r.fail("sgp-book", f"{where}: legs must all be at one book")
+    players = [l.get("player") for l in legs if l.get("player")]
+    if len(players) != len(set(players)):
+        r.fail("sgp-player", f"{where}: the same player twice")
+    for i, j, why in rules.ticket_conflicts(legs):
+        r.fail("conflict", f"{where} legs {i + 1} and {j + 1}: {why}")
+    fairs = [sharp_fair(l) for l in legs]
+    decs = [safe_dec(l.get("odds")) for l in legs]
+    if None in fairs or None in decs:
+        r.fail("sgp-market", f"{where}: every leg needs a sharp two-sided price")
+        return
+    win, d = math.prod(fairs), math.prod(decs)
+    if abs(float(t.get("fairJoint", -1)) - win) > 0.004:
+        r.fail("sgp-joint", f"{where}: fairJoint {t.get('fairJoint')} but the sharp chances multiply to {win:.3f}")
+    if win < SGP_MIN_JOINT - EPS:
+        r.fail("sgp-longshot", f"{where}: {win:.0%} to hit is under {SGP_MIN_JOINT:.0%}")
+    if t.get("straightOdds") is not None and abs(float(t["straightOdds"]) - american(d)) > 1:
+        r.fail("sgp-odds", f"{where}: straightOdds {sgn(t['straightOdds'])} but the legs multiply to {american(d):+d}")
+    for pct, am in (t.get("breakEven") or {}).items():
+        need = 1 + (1 / win - 1) / (1 + float(pct))
+        if safe_dec(am) is None or abs(safe_dec(am) - need) > 0.02:
+            r.fail("sgp-break-even", f"{where}: break-even at {float(pct):.0%} boost should be {american(need):+d}, not {sgn(am)}")
+
+
 def tickets_from(obj):
     """Accept build output, a list of docs, or {id: doc}."""
     if isinstance(obj, dict) and "board" in obj:
@@ -263,6 +360,9 @@ def audit(obj, never_against, now=None, books=None):
                 br.fail("board-value", f"board {i + 1}: no positive value, shouldn't be listed")
             if l["modelProb"] < BOARD["min_prob"] - EPS:
                 br.fail("board-prob", f"board {i + 1}: under 50% to win")
+            mv = market_value(l)
+            if mv is None or mv < BOARD["min_market_ev"] - EPS:
+                br.fail("board-market", f"board {i + 1}: FanDuel's price isn't at least the sharp fair price")
     if board:
         reports.append(br)
     lr = Report("longshots")
@@ -273,8 +373,17 @@ def audit(obj, never_against, now=None, books=None):
             if l["odds"] < LONGSHOT["min_odds"] or l["modelProb"] < LONGSHOT["min_prob"] - EPS \
                     or l["modelProb"] * ld - 1 < LONGSHOT["min_ev"] - EPS:
                 lr.fail("longshot-bar", f"payout play {i + 1} needs +120 or longer, 35%+ to win and +3% value")
+            mv = market_value(l)
+            if mv is None or mv < LONGSHOT["min_market_ev"] - EPS:
+                lr.fail("longshot-market", f"payout play {i + 1}: FanDuel's price isn't at least the sharp fair price")
     if lr.items:
         reports.append(lr)
+    sgps = (obj.get("sgp") or []) if isinstance(obj, dict) else []
+    sr = Report("sgp")
+    for i, t in enumerate(sgps):
+        check_sgp(sr, t, f"SGP {i + 1}", never_against, now, books)
+    if sgps:
+        reports.append(sr)
     # The same pick on several tickets stacks risk on one outcome.
     seen = {}
     for tid, t in tickets.items():

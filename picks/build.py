@@ -13,6 +13,13 @@ Bet types it produces:
   parlay3  the classic 3-leg parlay per sport, closest to a lock
   boost    the best use of each sportsbook promo (profit boosts), with the
            boosted payout
+  sgp      Same Game Parlay builder: per game, the 3 legs the book prices best
+           against the sharp market, with the lowest SGP price worth taking at
+           each common boost size
+
+Market first: every leg also carries `marketEv`, its value by the sharp no-vig
+price alone. A leg the book prices more than 2% worse than that is never used,
+and full-tier tickets must be worth at least break-even by the market alone.
 
 Prices: a candidate can carry `prices` = {"FanDuel": -130, "DraftKings": -120, ...}.
 Only books in settings `books` are used (empty = any book). Singles take the best
@@ -31,23 +38,51 @@ from .model import score
 
 SAME_GAME_PENALTY = 0.97   # per same-game pair; only old tickets have these (combo_ok rejects them)
 
-BIG = dict(min_prob=0.60, min_edge=0.025, min_ev=0.03, min_odds=-300, max_odds=150)
+# The most a leg's price may be worse than the sharp no-vig price (market value)
+# and still be used anywhere. FanDuel's juiced unders sat at -4% to -5% on 10/29.
+MARKET_FLOOR = -0.02
+
+BIG = dict(min_prob=0.60, min_edge=0.025, min_ev=0.03, min_odds=-300, max_odds=150, min_market_ev=0.0)
 PAIR = dict(min_leg_prob=0.60, min_leg_edge=0.0, min_joint=0.42,
-            min_dec=1.9, max_dec=3.6, min_ev=0.02, count=2)
+            min_dec=1.9, max_dec=3.6, min_ev=0.02, count=2, min_market_ev=0.0)
 PARLAY = dict(min_payout10=18.0, min_ev=0.0, min_leg_edge=0.0, soft_leg_edge=-0.01,
-              min_odds=-500, max_odds=-150)
-BOARD = dict(min_prob=0.50, min_ev=0.0, count=10, sweet_prob=0.55, sweet_dec=1.8)
-BOOST = dict(min_joint=0.25, max_legs=4, min_leg_edge=-0.01, pool=25)
+              min_odds=-500, max_odds=-150, min_market_ev=0.0)
+BOARD = dict(min_prob=0.50, min_ev=0.0, count=10, sweet_prob=0.55, sweet_dec=1.8, min_market_ev=0.0)
+BOOST = dict(min_joint=0.25, max_legs=4, min_leg_edge=-0.01, pool=25, min_market_ev=0.0)
+# Same Game Parlay builder. The joint chance assumes the legs are independent;
+# FanDuel reprices correlated legs, so the app shows the price to look for.
+SGP = dict(min_joint=0.12, min_odds=-300, max_odds=250, pool=12, min_leg_edge=-0.01,
+           pcts=(0.0, 0.25, 0.30, 0.50))
 
 # Leans: used only when a bet type has nothing that clears its full bar, so the
 # app is never empty. Still positive value, but a lower bar, and labeled as such.
-LEAN_BIG = dict(min_prob=0.55, min_edge=0.005, min_ev=0.005, min_odds=-400, max_odds=200, allow_thin=True)
+LEAN_BIG = dict(min_prob=0.55, min_edge=0.005, min_ev=0.005, min_odds=-400, max_odds=200, allow_thin=True,
+                min_market_ev=MARKET_FLOOR)
 LEAN_PAIR = dict(min_leg_prob=0.55, min_leg_edge=-0.005, min_joint=0.35,
-                 min_dec=1.7, max_dec=4.0, min_ev=0.005, count=1)
+                 min_dec=1.7, max_dec=4.0, min_ev=0.005, count=1, min_market_ev=MARKET_FLOOR)
 LEAN_PARLAY = dict(min_payout10=15.0, min_ev=0.0, min_leg_edge=-0.005, soft_leg_edge=-0.015,
-                   min_odds=-600, max_odds=150)
+                   min_odds=-600, max_odds=150, min_market_ev=MARKET_FLOOR)
 # Payout plays: plus-money singles with real value, for a bigger payout.
-LONGSHOT = dict(min_prob=0.35, min_ev=0.03, min_odds=120, count=5)
+LONGSHOT = dict(min_prob=0.35, min_ev=0.03, min_odds=120, count=5, min_market_ev=0.0)
+
+
+def sharp(l):
+    """The leg's fair price comes from a real two-sided sharp market."""
+    return l.get("fairProb") is not None and not l.get("fairFlag") and l.get("marketEv") is not None
+
+
+def market_ok(l):
+    """Usable at all: thin-priced legs pass here (they can only make leans);
+    sharp-priced legs must not be priced much worse than the market."""
+    return not sharp(l) or l["marketEv"] >= MARKET_FLOOR
+
+
+def market_clears(t, cfg):
+    """Ticket-level market check. A ticket with a thin leg has no market value,
+    which only a lean bar (one that allows negative market value) accepts."""
+    if t.get("marketEv") is None:
+        return cfg["min_market_ev"] < 0
+    return t["marketEv"] >= cfg["min_market_ev"]
 
 
 def joint(legs):
@@ -84,6 +119,10 @@ def ticket(kind, legs, date, sport=None, boost=None, **extra):
         "result": "open",
         "placed": False,
     }
+    if all(sharp(l) for l in legs):
+        mwin = math.prod(l["fairProb"] for l in legs)
+        doc["marketWin"] = round(mwin, 3)
+        doc["marketEv"] = round(om.ev_dec(mwin, dec), 3)
     if len(books) == 1 and None not in books:
         doc["book"] = books.pop()
     if boost:
@@ -174,7 +213,8 @@ def prepare(candidates, shrink, never_against, books=()):
 
 
 def build_board(legs):
-    b = [l for l in legs if l["modelProb"] >= BOARD["min_prob"] and l["ev"] > BOARD["min_ev"]]
+    b = [l for l in legs if l["modelProb"] >= BOARD["min_prob"] and l["ev"] > BOARD["min_ev"]
+         and sharp(l) and l["marketEv"] >= BOARD["min_market_ev"]]
     b.sort(key=lambda l: l["growth"], reverse=True)
     out = []
     for l in b[:BOARD["count"]]:
@@ -189,7 +229,8 @@ def build_big(legs, date, cfg=BIG):
     c = [l for l in legs
          if l["modelProb"] >= cfg["min_prob"] and l["edge"] >= cfg["min_edge"]
          and l["ev"] >= cfg["min_ev"] and cfg["min_odds"] <= l["odds"] <= cfg["max_odds"]
-         and (cfg.get("allow_thin") or not l.get("fairFlag"))]
+         and (cfg.get("allow_thin") or not l.get("fairFlag"))
+         and market_ok(l) and (l["marketEv"] >= cfg["min_market_ev"] if sharp(l) else cfg["min_market_ev"] < 0)]
     if not c:
         return None
     best = max(c, key=lambda l: l["growth"])
@@ -201,14 +242,14 @@ def build_pairs(by_book, date, exclude=(), cfg=PAIR):
     found = []
     for legs in by_book.values():
         pool = [l for l in legs if l["modelProb"] >= cfg["min_leg_prob"]
-                and l["edge"] >= cfg["min_leg_edge"] and l.get("pick") not in exclude]
+                and l["edge"] >= cfg["min_leg_edge"] and l.get("pick") not in exclude and market_ok(l)]
         for a, b in itertools.combinations(pool, 2):
             if not combo_ok([a, b]):
                 continue
             t = ticket("pair", [a, b], date)
             dec = t["payout10"] / 10
             if (t["winChance"] >= cfg["min_joint"] and cfg["min_dec"] <= dec <= cfg["max_dec"]
-                    and t["ev"] >= cfg["min_ev"]):
+                    and t["ev"] >= cfg["min_ev"] and market_clears(t, cfg)):
                 found.append(t)
     found.sort(key=lambda t: (t["growth"], diff_games(t)), reverse=True)
     out, used = [], set()
@@ -229,7 +270,7 @@ def diff_games(t):
 
 def build_parlay(legs, date, sport, cfg=PARLAY):
     pool = [l for l in legs if str(l["sport"]).upper() == sport and l["edge"] >= cfg["soft_leg_edge"]
-            and cfg["min_odds"] <= l["odds"] <= cfg["max_odds"]]
+            and cfg["min_odds"] <= l["odds"] <= cfg["max_odds"] and market_ok(l)]
     found = []
     for combo in itertools.combinations(pool, 3):
         if sum(1 for l in combo if l["edge"] < cfg["min_leg_edge"]) > 1:
@@ -237,7 +278,7 @@ def build_parlay(legs, date, sport, cfg=PARLAY):
         if not combo_ok(list(combo)):
             continue
         t = ticket("parlay3", list(combo), date, sport=sport)
-        if t["payout10"] >= cfg["min_payout10"] and t["ev"] >= cfg["min_ev"]:
+        if t["payout10"] >= cfg["min_payout10"] and t["ev"] >= cfg["min_ev"] and market_clears(t, cfg):
             found.append(t)
     if not found:
         return None, []
@@ -254,7 +295,7 @@ def build_parlay(legs, date, sport, cfg=PARLAY):
             if not combo_ok(legs3):
                 return False
             t = ticket("parlay3", legs3, date, sport=sport)
-            if t["payout10"] < cfg["min_payout10"] or t["ev"] < cfg["min_ev"]:
+            if t["payout10"] < cfg["min_payout10"] or t["ev"] < cfg["min_ev"] or not market_clears(t, cfg):
                 return False
         return True
 
@@ -274,7 +315,7 @@ def lean(t):
 def build_longshots(legs):
     """Plus-money singles with real value: lower win chance, bigger payout."""
     c = [l for l in legs if l["odds"] >= LONGSHOT["min_odds"] and l["modelProb"] >= LONGSHOT["min_prob"]
-         and l["ev"] >= LONGSHOT["min_ev"]]
+         and l["ev"] >= LONGSHOT["min_ev"] and sharp(l) and l["marketEv"] >= LONGSHOT["min_market_ev"]]
     return sorted(c, key=lambda l: l["growth"], reverse=True)[:LONGSHOT["count"]]
 
 
@@ -289,7 +330,7 @@ def build_boosts(by_book, boosts, date):
     for b in boosts:
         pct = float(b.get("pct") or 0)
         legs = by_book.get(b.get("book"), [])
-        pool = [l for l in legs if l["edge"] >= BOOST["min_leg_edge"]
+        pool = [l for l in legs if l["edge"] >= BOOST["min_leg_edge"] and market_ok(l)
                 and (not b.get("sport") or str(l["sport"]).upper() == str(b["sport"]).upper())
                 and l["odds"] >= b.get("minLegOdds", -10000)]
         pool = sorted(pool, key=lambda l: l["modelProb"], reverse=True)[:BOOST["pool"]]
@@ -305,13 +346,74 @@ def build_boosts(by_book, boosts, date):
                 info = {k: b[k] for k in ("id", "book", "title", "maxStake", "expires") if k in b}
                 info["pct"] = pct
                 t = ticket("boost", list(combo), date, boost=info)
-                if t["winChance"] < BOOST["min_joint"] or t["ev"] <= 0:
+                if t["winChance"] < BOOST["min_joint"] or t["ev"] <= 0 \
+                        or not market_clears(t, BOOST):
                     continue
                 if best is None or t["growth"] > best["growth"]:
                     best = t
         if best:
             out.append(best)
     return out
+
+
+def sgp_combo_ok(legs):
+    """One story per player: no player twice, and no conflicting legs."""
+    players = [l.get("player") for l in legs if l.get("player")]
+    return len(players) == len(set(players)) and not rules.ticket_conflicts(legs)
+
+
+def break_even_odds(win, pct):
+    """Lowest pre-boost price (American) that is worth taking at this win chance."""
+    return om.dec_to_am(1 + (1 / win - 1) / (1 + pct))
+
+
+def build_sgp(by_book, date, book="FanDuel"):
+    """Per game: the 3 legs that the book prices best against the sharp market.
+
+    Ranked by market value at the straight-multiplied price; the app shows the
+    lowest Same Game Parlay price worth taking with and without a boost.
+    """
+    games = {}
+    for l in by_book.get(book, []):
+        if (sharp(l) and l["marketEv"] >= MARKET_FLOOR and l["edge"] >= SGP["min_leg_edge"]
+                and SGP["min_odds"] <= l["odds"] <= SGP["max_odds"]):
+            games.setdefault(rules.game_key(l["game"]), []).append(l)
+    out = []
+    for legs in games.values():
+        pool = sorted(legs, key=lambda l: l["marketEv"], reverse=True)[:SGP["pool"]]
+        best = None
+        for combo in itertools.combinations(pool, 3):
+            if not sgp_combo_ok(list(combo)):
+                continue
+            win = math.prod(l["fairProb"] for l in combo)
+            if win < SGP["min_joint"]:
+                continue
+            dec = om.parlay_dec([l["odds"] for l in combo])
+            val = om.ev_dec(win, dec)
+            if best is None or val > best[0]:
+                best = (val, win, dec, list(combo))
+        if best:
+            val, win, dec, combo = best
+            out.append({
+                "kind": "sgp", "date": date, "book": book, "sport": combo[0]["sport"],
+                "game": combo[0]["game"], "startISO": combo[0].get("startISO"), "legs": combo,
+                "fairJoint": round(win, 3), "straightOdds": om.dec_to_am(dec),
+                "straightValue": round(val, 3),
+                "breakEven": {str(p): break_even_odds(win, p) for p in SGP["pcts"]},
+            })
+    return sorted(out, key=lambda t: t["straightValue"], reverse=True)
+
+
+MARKET_FIELDS = ("sport", "game", "start", "startISO", "pick", "market", "type", "team", "player",
+                 "odds", "book", "fairProb", "marketEv", "modelProb")
+
+
+def market_snapshot(by_book, sgp, date, book="FanDuel"):
+    """Every sharp-priced leg at the book, for the app's parlay checker (doc market/<date>)."""
+    legs = [{k: l.get(k) for k in MARKET_FIELDS if l.get(k) is not None}
+            for l in by_book.get(book, []) if sharp(l)]
+    legs.sort(key=lambda l: (l["game"], -l["marketEv"]))
+    return {"date": date, "book": book, "legs": legs, "sgp": sgp}
 
 
 def build_all(candidates, date, settings=None, stats=None, boosts_in=None):
@@ -343,11 +445,13 @@ def build_all(candidates, date, settings=None, stats=None, boosts_in=None):
             parlays[sport] = best
             top5[sport] = alts
     boosts = build_boosts(by_book, boosts_in, date) if boosts_in else []
+    sgp = build_sgp(by_book, date)
     return {
         "date": date, "shrink": shrink, "candidates": len(candidates), "books": books,
         "dropped": [{"pick": l.get("pick"), "why": why} for l, why in dropped],
         "board": board, "big": big, "pairs": pairs, "parlays": parlays, "top5": top5,
-        "boosts": boosts, "longshots": build_longshots(legs),
+        "boosts": boosts, "longshots": build_longshots(legs), "sgp": sgp,
+        "market": market_snapshot(by_book, sgp, date),
     }
 
 
@@ -369,7 +473,8 @@ def main(argv=None):
         sys.stdout.write(text + "\n")
     show = lambda t: (f"{t['kind']:8} {t.get('book', '?'):10} {t['parlayOdds']:+5d}  win {t['winChance']:.0%}  "
                       f"ev {t['ev']:+.1%}  | " + " + ".join(f"{l['pick']} ({l['odds']:+d})" for l in t["legs"]))
-    print(f"{len(res['board'])} board bets, {len(res['dropped'])} candidates dropped (see `dropped`)", file=sys.stderr)
+    print(f"{len(res['board'])} board bets, {len(res['sgp'])} SGP builds, "
+          f"{len(res['dropped'])} candidates dropped (see `dropped`)", file=sys.stderr)
     for t in ([res["big"]] if res["big"] else []) + res["pairs"] + list(res["parlays"].values()) + res["boosts"]:
         print(show(t), file=sys.stderr)
 

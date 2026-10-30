@@ -28,7 +28,9 @@ MAX_DEVIATION = 0.07
 # overstates those edges (the "optimizer's curse", Smith & Winkler 2006), and
 # on 10/28 twelve Pinnacle-priced singles the model put ~6-7 pts above the
 # market hit 6 of 12 (50%), right at Pinnacle's ~51%, not the model's ~59%.
-SHARP_MAX_DEVIATION = 0.04
+# Through 10/29, 31 graded legs hit 58% against 65% expected, and the 50-60%
+# bucket hit 43%, so the stats may now move a sharp price by 2.5 points at most.
+SHARP_MAX_DEVIATION = 0.025
 
 
 def stat_prob(hit_rates):
@@ -129,6 +131,10 @@ def score(c, shrink=0.5):
         "edge": round(p - implied, 3),
         "ev": round(om.ev_dec(p, dec), 3),
         "growth": round(om.growth(p, dec), 5),
+        # What the price is worth by the market alone, no stats: the sharp
+        # no-vig chance times the payout. Below zero, the book is charging more
+        # than the bet is worth.
+        "marketEv": round(fair * dec - 1, 3) if fair is not None else None,
         "result": c.get("result", "open"),
     })
     if c.get("hitRates") and not c.get("hitRate"):

@@ -42,6 +42,17 @@ report; the researcher fixes and re-submits.
      minimum odds, sport, max stake) and that the ticket meets them.
    - Also find a sharp or consensus price for both sides and check that
      `fairProb` is within 3 points of what you get.
+   - Market first: each leg's `marketEv` is FanDuel's payout times the sharp
+     no-vig chance, minus 1. Re-check it from Pinnacle's current two-sided
+     price (picks.fetch pulls it; you can rerun `python3 -m picks.fetch` into
+     your own scratch folder). A leg that is now below -2%, or a full-tier
+     ticket whose market value (sharp chances multiplied, times the payout)
+     is now below 0: FIX. Don't let a stats story excuse a price that is
+     worse than the sharp market; the stats may move it 2.5 points at most.
+   - `sgp` builds (Same Game Parlay builder): confirm each leg is offered at
+     FanDuel at that price and line, the three legs don't contradict each
+     other, and no leg's player is out. The break-even numbers are math the
+     script checks; don't re-derive them.
 
 3. **Availability and news.** For each leg: is the player active / starting, is
    the pitcher confirmed, any minutes limit, weather (outdoor NFL/MLB), is the

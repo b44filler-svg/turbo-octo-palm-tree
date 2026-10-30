@@ -68,7 +68,8 @@ def test_tiny_season_window_counts_less():
 
 
 def test_thin_sample_leans_on_market():
-    base = {"odds": -150, "sharpOdds": [-150, 130], "type": "prop over", "team": "X"}
+    # A thin (book-only) price keeps the wide leash, so the sample size shows.
+    base = {"odds": -150, "bookOdds": [-150, 130], "type": "prop over", "team": "X"}
     thin = model.score({**base, "hitRates": {"season": [3, 3]}})
     deep = model.score({**base, "hitRates": {"season": [30, 30]}})
     assert thin["modelProb"] < deep["modelProb"]
@@ -309,6 +310,11 @@ def test_audit_thresholds_match_builder():
     assert {k: build.PARLAY[k] for k in audit.PARLAY} == audit.PARLAY
     assert audit.BOARD["min_prob"] == build.BOARD["min_prob"]
     assert audit.BOOST_MIN_JOINT == build.BOOST["min_joint"]
+    assert audit.MARKET_FLOOR == build.MARKET_FLOOR
+    assert audit.BOARD["min_market_ev"] == build.BOARD["min_market_ev"]
+    assert audit.BOOST_MIN_MARKET_EV == build.BOOST["min_market_ev"]
+    assert audit.LONGSHOT["min_market_ev"] == build.LONGSHOT["min_market_ev"]
+    assert audit.SGP_MIN_JOINT == build.SGP["min_joint"]
 
 
 def test_audit_survives_garbage(built):
@@ -544,4 +550,90 @@ def test_audit_catches_model_too_far_from_sharp_price(built):
 
 
 def test_audit_sharp_leash_is_its_own_number():
-    assert "0.041" in Path(audit.__file__).read_text()
+    assert "SHARP_LEASH = 0.026" in Path(audit.__file__).read_text()
+    assert abs(audit.SHARP_LEASH - model.SHARP_MAX_DEVIATION) < 0.002
+
+
+# ---------- market first ----------
+
+def leg_c(pick, odds, sharp_odds, game="Panthers @ Packers", player=None, typ="prop over", team="Green Bay Packers"):
+    return {"sport": "NFL", "game": game, "start": "8:15 PM ET", "startISO": "2026-11-30T01:15:00Z",
+            "pick": pick, "market": "Receptions", "type": typ, "team": team, "player": player or pick.split(" Over")[0],
+            "prices": {"FanDuel": odds}, "sharpOdds": sharp_odds, "sharpSource": "Pinnacle", "source": "feed"}
+
+
+def test_market_ev_is_sharp_value_alone():
+    s = model.score({"odds": -113, "sharpOdds": [-132, 109], "type": "prop under", "team": "X"})
+    assert abs(s["marketEv"] - (s["fairProb"] * om.am_to_dec(-113) - 1)) < 0.002
+    assert s["marketEv"] > 0
+
+
+def test_overpriced_legs_never_reach_tickets_or_board():
+    # FanDuel -180 on a side Pinnacle prices at about 61.5%: -4% by the market.
+    over = leg_c("A Over 3.5", -180, [-175, 135], player="A")
+    res = build.build_all([over], "2026-11-29", {"neverAgainst": EAGLES})
+    picked = [l["pick"] for t in [res["big"]] + res["pairs"] + list(res["parlays"].values()) if t for l in t["legs"]]
+    assert "A Over 3.5" not in picked + [l["pick"] for l in res["board"]]
+
+
+def test_full_tier_tickets_are_worth_it_by_the_market_alone(built):
+    for t in [built["big"]] + built["pairs"] + list(built["parlays"].values()):
+        if t and t.get("tier") != "lean" and t.get("marketEv") is not None:
+            assert t["marketEv"] >= 0
+            assert t["marketWin"] == round(math.prod(l["fairProb"] for l in t["legs"]), 3)
+
+
+def test_audit_power_devig_matches_engine():
+    for pair in ([-132, 109], [-175, 135], [110, -130], [-110, -110]):
+        assert abs(audit.power_fair(pair) - om.fair_prob(pair)) < 1e-4
+
+
+def test_audit_catches_overpriced_and_bad_market_math():
+    l = model.score({**leg_c("A Over 3.5", -180, [-175, 135], player="A"), "odds": -180, "book": "FanDuel"})
+    r = audit.Report("x")
+    audit.check_leg(r, l, "leg", EAGLES, None)
+    assert "overpriced" in {i["code"] for i in r.items}
+    good = model.score({**leg_c("B Over 3.5", -105, [-120, 100], player="B"), "odds": -105, "book": "FanDuel"})
+    r = audit.Report("y")
+    audit.check_leg(r, {**good, "marketEv": good["marketEv"] + 0.05}, "leg", EAGLES, None)
+    audit.check_leg(r, {**good, "fairProb": good["fairProb"] + 0.05}, "leg", EAGLES, None)
+    assert {"market-math", "fair-math"} <= {i["code"] for i in r.items}
+
+
+SGP_POOL = [
+    leg_c("Kraft Over 4.5", 116, [107, -130], player="Kraft"),
+    leg_c("Young Under 252.5", -113, [-132, 109], player="Young", typ="prop under", team="Carolina Panthers"),
+    leg_c("Evans Under 6.5", -100, [-110, -110], player="Evans", typ="prop under", team="Carolina Panthers"),
+    leg_c("Love Over 0.5", -108, [-117, -101], player="Love"),
+    leg_c("Kraft Over 40.5", -110, [-115, -105], player="Kraft"),
+]
+
+
+def test_sgp_builder_picks_best_priced_legs_and_break_even():
+    res = build.build_all(SGP_POOL, "2026-11-29", {"neverAgainst": EAGLES})
+    assert len(res["sgp"]) == 1
+    s = res["sgp"][0]
+    players = [l["player"] for l in s["legs"]]
+    assert len(s["legs"]) == 3 and len(set(players)) == 3
+    win = math.prod(l["fairProb"] for l in s["legs"])
+    assert s["fairJoint"] == round(win, 3)
+    need = 1 + (1 / win - 1) / 1.3
+    assert abs(om.am_to_dec(s["breakEven"]["0.3"]) - need) < 0.02
+    assert om.am_to_dec(s["breakEven"]["0.0"]) > om.am_to_dec(s["breakEven"]["0.3"])
+    assert not [r for r in audit.audit(res, EAGLES, NOW) if r.status == "FAIL"]
+
+
+def test_audit_catches_tampered_sgp():
+    res = build.build_all(SGP_POOL, "2026-11-29", {"neverAgainst": EAGLES})
+    bad = copy.deepcopy(res)
+    bad["sgp"][0]["breakEven"]["0.3"] = 150
+    bad["sgp"][0]["fairJoint"] = 0.30
+    found = {i["code"] for r in audit.audit(bad, EAGLES, NOW) for i in r.items}
+    assert {"sgp-break-even", "sgp-joint"} <= found
+
+
+def test_sgp_respects_loyalty():
+    eagles = [leg_c(f"P{i} Under 50.5", -105, [-125, 105], game="Eagles @ Giants", player=f"P{i}",
+                    typ="prop under", team="Philadelphia Eagles") for i in range(4)]
+    res = build.build_all(eagles, "2026-11-29", {"neverAgainst": EAGLES})
+    assert res["sgp"] == []

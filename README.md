@@ -42,7 +42,24 @@ land side by side, which is the "high win % *and* high payout" trade-off.
    app's learning record and rises when results trail the model.
 4. **Adjustments**: prop unders +1.5 pts, star overs -1 pt (public money bias),
    matchup `adjust` ±5, expert/news `newsAdjust` ±3, line moved against -2.
-5. **Guard rails**: the model may sit at most **4 points** from a sharp two-sided no-vig price (7 from a thin, FanDuel-only one; picking the biggest edges out of dozens overstates them), and never above 92%.
+5. **Guard rails**: the model may sit at most **2.5 points** from a sharp two-sided no-vig price (7 from a thin, FanDuel-only one; picking the biggest edges out of dozens overstates them), and never above 92%.
+6. **Market first**: each leg also gets `marketEv`, its value by the sharp
+   no-vig price alone. No leg priced more than 2% worse than that is used
+   anywhere (`MARKET_FLOOR`); full-tier tickets, the board and payout plays must
+   be worth at least break-even by the market alone (leans: -2%). Through 10/29
+   the stat-driven picks hit 58% of legs against 65% expected, and FanDuel's
+   juiced unders sat 4-5% worse than Pinnacle.
+
+## Boost builder (`sgp`) and the price snapshot (`market`)
+
+`build_sgp` picks, per game, the 3 FanDuel legs priced best against the sharp
+market (one leg per player, no contradictions) and gives `fairJoint` (sharp
+chances multiplied, as if independent) and `breakEven`: the lowest pre-boost
+Same Game Parlay price worth taking with no boost and with 25/30/50% boosts,
+`1 + (1/p - 1)/(1 + boost)`. `market` is every sharp-priced FanDuel leg; the app's
+"check your own parlay" tool reads it from `market/<date>`. `picks.audit`
+re-derives all of it from the raw prices. `prompts/price-scan.md` refreshes it
+midday and adds new value bets the auditor clears.
 
 ## The checks
 
