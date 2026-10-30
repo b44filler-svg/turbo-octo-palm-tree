@@ -161,6 +161,12 @@ function mock(DATA) {
     await page.locator("#builderBox .calc input").first().fill("+150");
     const bad = await page.locator("#builderBox .verdict").first().textContent();
     if (!/Good value/.test(good) || !/Overpriced/.test(bad)) fail(`${width}px verdicts: "${good}" / "${bad}"`);
+    // A typographic minus is a minus, and a decimal isn't American odds.
+    await page.locator("#builderBox .calc input").first().fill("\u2212120");
+    const minus = await page.locator("#builderBox .verdict").first().textContent();
+    await page.locator("#builderBox .calc input").first().fill("4.50");
+    const dec = await page.locator("#builderBox .verdict").first().textContent();
+    if (!/Overpriced/.test(minus) || !/Type FanDuel/.test(dec)) fail(`${width}px price parsing: "${minus}" / "${dec}"`);
     await page.locator("#builderBox .pick-list input").nth(0).check();
     await page.locator("#builderBox .pick-list input").nth(1).check();
     const own = await page.evaluate(() => [...document.querySelectorAll("#builderBox .bb")].pop().querySelectorAll(".bb-need").length);

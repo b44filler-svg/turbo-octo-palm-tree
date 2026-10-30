@@ -637,3 +637,63 @@ def test_sgp_respects_loyalty():
                     typ="prop under", team="Philadelphia Eagles") for i in range(4)]
     res = build.build_all(eagles, "2026-11-29", {"neverAgainst": EAGLES})
     assert res["sgp"] == []
+
+
+# ---------- review findings (10/30) ----------
+
+def test_typed_fair_price_is_never_sharp():
+    # FanDuel -180 with a made-up 66% "Pinnacle" fair price and no raw prices.
+    c = {**leg_c("A Over 3.5", -180, None, player="A"), "fairProb": 0.66, "fairFlag": False}
+    c.pop("sharpOdds")
+    s = model.score({**c, "odds": -180})
+    assert s["fairFlag"] is True
+    res = build.build_all([c], "2026-11-29", {"neverAgainst": EAGLES})
+    assert res["big"] is None and res["board"] == []
+    r = audit.Report("x")
+    audit.check_leg(r, {**s, "fairFlag": False, "book": "FanDuel"}, "leg", EAGLES, None)
+    assert "unverifiable-sharp" in {i["code"] for i in r.items}
+
+
+def test_audit_ignores_a_thin_flag_on_sharp_prices():
+    s = model.score({**leg_c("A Over 3.5", -180, [-175, 135], player="A"), "odds": -180})
+    r = audit.Report("x")
+    audit.check_leg(r, {**s, "fairFlag": True, "book": "FanDuel"}, "leg", EAGLES, None)
+    assert {"flag-mismatch", "overpriced"} <= {i["code"] for i in r.items}
+
+
+def test_sides_that_dont_form_one_market_are_dropped():
+    c = leg_c("A Over 3.5", -110, [-200, 250], player="A")   # implied sums to 95%
+    res = build.build_all([c], "2026-11-29", {"neverAgainst": EAGLES})
+    assert res["dropped"] and "one market" in res["dropped"][0]["why"]
+    with pytest.raises(ValueError):
+        audit.power_fair([-200, 250])
+
+
+def test_leans_are_never_negative_by_the_market():
+    # A lean the stats like but the sharp market prices 1.5% under: not posted.
+    c = {**leg_c("A Over 3.5", -165, [-170, 145], player="A"), "adjust": 0.05}
+    res = build.build_all([c], "2026-11-29", {"neverAgainst": EAGLES})
+    assert res["big"] is None
+
+
+def test_sgp_never_mixes_over_and_under_on_one_team():
+    pool = [leg_c("QB Under 250.5", -105, [-120, 100], player="QB", typ="prop under"),
+            leg_c("WR Over 70.5", -105, [-120, 100], player="WR"),
+            leg_c("TE Over 30.5", -105, [-120, 100], player="TE"),
+            leg_c("RB Over 50.5", -105, [-120, 100], player="RB")]
+    res = build.build_all(pool, "2026-11-29", {"neverAgainst": EAGLES})
+    for s in res["sgp"]:
+        assert {l["type"] for l in s["legs"]} == {"prop over"}
+    bad = copy.deepcopy(res)
+    bad["sgp"][0]["legs"][0] = model.score({**pool[0], "odds": -105, "book": "FanDuel"})
+    assert "sgp-opposed" in {i["code"] for r in audit.audit(bad, EAGLES, NOW) for i in r.items}
+
+
+def test_rounding_never_lets_a_losing_market_value_through():
+    # Exact market value just under zero must not post even if it rounds to 0.000.
+    for odds in range(-130, -100):
+        c = leg_c("A Over 3.5", odds, [-125, 105], player="A")
+        res = build.build_all([c], "2026-11-29", {"neverAgainst": EAGLES})
+        for l in res["board"]:
+            assert build.mev(l) >= 0
+        assert not [r for r in audit.audit(res, EAGLES, NOW) if r.status == "FAIL"]

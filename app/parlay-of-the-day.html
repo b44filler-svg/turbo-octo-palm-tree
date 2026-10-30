@@ -1249,10 +1249,18 @@ const boosted = (d, pct) => 1 + (d - 1) * (1 + pct);
 const PCTS = [0, 0.25, 0.30, 0.50];
 let bbGame = "", bbPicked = new Set(), bbPrice = {}, bbPct = {};
 
+// American odds as typed on a phone: "+450", "450", "-120" or "−120" (a typographic minus). Anything else: null.
+function parseAm(txt){
+  const t = String(txt||"").trim().replace(/[\u2212\u2013\u2014]/g,"-").replace(/\s+/g,"");
+  if(!/^[+-]?\d{3,5}$/.test(t)) return null;
+  const a = Number(t);
+  return Math.abs(a) >= 100 ? a : null;
+}
+
 function verdictFor(win, price, pct){
   const box = el("p","verdict");
-  const a = Number(String(price||"").replace(/[^0-9+-]/g,""));
-  if(!Number.isFinite(a) || Math.abs(a) < 100){ box.append(el("b",null,"Type FanDuel's price"), "Enter the parlay price FanDuel shows before the boost, like +450."); return box; }
+  const a = parseAm(price);
+  if(a === null){ box.append(el("b",null,"Type FanDuel's price"), "Enter the parlay price FanDuel shows before the boost, like +450 or -120."); return box; }
   const d = boosted(toDec(a), pct), v = win * d - 1;
   const pays = "$10 pays " + money(10*d) + (pct ? " with the " + Math.round(pct*100) + "% boost" : "");
   if(v >= 0.05){ box.className = "verdict good"; box.append(el("b",null,"Good value · +" + (v*100).toFixed(0) + "%"), pays + ". At the sharp market's chances this bet is worth more than it costs. Still about " + Math.round(win*100) + "% to hit, so keep it small."); }
@@ -1264,7 +1272,7 @@ function verdictFor(win, price, pct){
 
 function needGrid(win){
   const g = el("div","bb-need");
-  PCTS.forEach(p=>{ const c = el("div"); c.append(el("small",null, p ? Math.round(p*100) + "% boost" : "No boost"), el("b",null, fmtAm(toAm(1 + (1/win - 1)/(1 + p))) + "+")); g.append(c); });
+  PCTS.forEach(p=>{ const c = el("div"); c.append(el("small",null, p ? Math.round(p*100) + "% boost" : "No boost"), el("b",null, fmtAm(toAm(1 + (1/win - 1)/(1 + p)))), el("small",null,"or better")); g.append(c); });
   return g;
 }
 
@@ -1273,7 +1281,7 @@ function calcRow(key, win){
   const row = el("div","set-row");
   const inId = "price-" + key, selId = "pct-" + key;
   const lab1 = el("label",null,"FanDuel price (before boost)"); lab1.htmlFor = inId;
-  const inp = el("input"); inp.id = inId; inp.inputMode = "numeric"; inp.placeholder = "+450"; inp.value = bbPrice[key] || "";
+  const inp = el("input"); inp.id = inId; inp.inputMode = "text"; inp.autocomplete = "off"; inp.placeholder = "+450"; inp.value = bbPrice[key] || "";
   const lab2 = el("label",null,"Boost"); lab2.htmlFor = selId;
   const sel = el("select"); sel.id = selId;
   PCTS.forEach(p=>{ const o = el("option",null, p ? Math.round(p*100) + "%" : "None"); o.value = p; if((bbPct[key] ?? 0.30) === p) o.selected = true; sel.append(o); });
@@ -1287,16 +1295,19 @@ function calcRow(key, win){
   return wrap;
 }
 
-function renderBuilder(){
-  const box = $("builderBox"); if(!box) return; box.replaceChildren();
+function renderBuilder(force){
+  const box = $("builderBox"); if(!box) return;
+  // A live update mustn't wipe out a price being typed (and close the phone keyboard).
+  if(!force && box.contains(document.activeElement) && document.activeElement.tagName === "INPUT") return;
+  box.replaceChildren();
   const m = market && dkey(market) === todayET() ? market : null;
   const head = el("div","boost-head");
   head.append(el("h2",null,"Boost builder"), el("p",null,"For FanDuel's Same Game Parlay boosts. Each build is the 3 legs in a game that FanDuel prices best against Pinnacle's sharp line. Build it in the FanDuel app, look at the price before the boost, and compare it with the line below: at or above it, the bet is worth taking."));
   box.append(head);
   if(!m){ box.append(el("p","note","No prices loaded for today yet. They come with the morning picks and refresh during the day.")); return; }
   const now = Date.now();
-  (m.sgp||[]).filter(s=>!s.startISO || Date.parse(s.startISO) > now).forEach((s,i)=>{
-    const art = el("article","bb"), key = "sgp" + i;
+  (m.sgp||[]).filter(s=>!s.startISO || Date.parse(s.startISO) > now).forEach(s=>{
+    const art = el("article","bb"), key = "sgp:" + s.game;
     const h = el("div","t-head"), hl = el("div");
     hl.append(el("h2",null,s.game), el("p",null,[s.sport, s.startISO ? new Date(s.startISO).toLocaleTimeString("en-US",{timeZone:tz,hour:"numeric",minute:"2-digit"}) + " ET" : "", "at " + (s.book||"FanDuel")].filter(Boolean).join(" · ")));
     h.append(hl, el("span","tag", Math.round(s.fairJoint*100) + "% to hit"));
@@ -1307,7 +1318,7 @@ function renderBuilder(){
     art.append(el("p","boost-math", "Lowest FanDuel price worth taking (before the boost). Straight-multiplied the legs pay " + fmtAm(Number(s.straightOdds)) + "; FanDuel usually pays less for legs in the same game."));
     art.append(needGrid(Number(s.fairJoint)));
     art.append(calcRow(key, Number(s.fairJoint)));
-    art.append(el("p","honest","The hit chance treats the legs as independent; legs that tell one story (a shootout, a blowout) hit together a bit more often. Never a sure thing."));
+    art.append(el("p","honest","The hit chance treats the legs as independent. Legs that tell one story (a shootout, a blowout) hit together a bit more often; legs that pull against each other hit together less often, so the builds never mix them. Never a sure thing."));
     box.append(art);
   });
   // your own parlay
@@ -1323,13 +1334,13 @@ function renderBuilder(){
   const lab = el("label",null,"Game"); lab.htmlFor = "bbGame";
   const sel = el("select"); sel.id = "bbGame"; sel.style.width = "100%"; sel.style.maxWidth = "360px";
   gamesList.forEach(g=>{ const o = el("option",null,g); o.value = g; if(g===bbGame) o.selected = true; sel.append(o); });
-  sel.onchange = ()=>{ bbGame = sel.value; bbPicked = new Set(); renderBuilder(); };
+  sel.onchange = ()=>{ bbGame = sel.value; bbPicked = new Set(); renderBuilder(true); };
   sr.append(lab, sel); row.append(sr); art.append(row);
   const pool = legs.filter(l=>l.game===bbGame).sort((a,b)=>Number(b.marketEv)-Number(a.marketEv));
   const ul = el("ul","pick-list");
   pool.forEach(l=>{
     const li = el("li"), lb = el("label"), cb = el("input"); cb.type = "checkbox"; cb.checked = bbPicked.has(l.pick);
-    cb.onchange = ()=>{ cb.checked ? bbPicked.add(l.pick) : bbPicked.delete(l.pick); renderBuilder(); };
+    cb.onchange = ()=>{ cb.checked ? bbPicked.add(l.pick) : bbPicked.delete(l.pick); renderBuilder(true); };
     const pm = el("span","pm"); pm.append("Sharp chance " + pc(l.fairProb) + " · ", el("span", Number(l.marketEv)>=0 ? "up" : "dn", (Number(l.marketEv)>=0 ? "beats sharp +" : "pricier than sharp ") + (Number(l.marketEv)*100).toFixed(1) + "%"));
     lb.append(cb, el("span",null,l.pick), el("span","odds",fmtAm(Number(l.odds))), pm);
     li.append(lb); ul.append(li);
@@ -1341,9 +1352,13 @@ function renderBuilder(){
     const same = new Set(chosen.map(l=>l.player).filter(Boolean)).size < chosen.filter(l=>l.player).length;
     const sum = el("p","boost-math"); sum.append(chosen.length + " leg" + (chosen.length>1?"s":"") + " · about ", el("b",null, (win*100).toFixed(1) + "% to hit"), " · straight-multiplied " + fmtAm(toAm(straight)));
     art.append(sum);
+    const dirs = {};
+    chosen.forEach(l=>{ const t = String(l.type||""); if(t.startsWith("prop ")) (dirs[l.team] = dirs[l.team] || new Set()).add(t.split(" ").pop()); });
+    const opposed = Object.values(dirs).some(d=>d.size > 1);
     if(same) art.append(el("p","lean-note","Two legs on the same player move together; the hit chance here is only a rough guide."));
+    if(opposed) art.append(el("p","lean-note","An over and an under on the same team's players usually pull against each other (a QB under with his receiver over), so the real hit chance is lower than shown. Be careful with this mix."));
     art.append(needGrid(win));
-    art.append(calcRow("own-" + bbGame, win));
+    art.append(calcRow("own:" + bbGame + ":" + chosen.map(l=>l.pick).sort().join("|"), win));
   }
   art.append(el("p","honest","Prices update a few times a day" + (m.at ? " (last " + new Date(m.at).toLocaleTimeString("en-US",{timeZone:tz,hour:"numeric",minute:"2-digit"}) + " ET)" : "") + "; check FanDuel's current price. Never a sure thing."));
   box.append(art);
@@ -1371,7 +1386,14 @@ renderAll();
   db.collection("board").orderBy("date","desc").limit(60).onSnapshot(snap=>{ boards = snap.docs.map(d=>Object.assign({_id:d.id}, d.data())); renderAll(); }, ()=>{});
   db.doc("settings/main").onSnapshot(s=>{ if(s.exists){ settings = Object.assign({defaultStake:10, monthlyBudget:0}, s.data()); renderAll(); } }, ()=>{});
   db.doc("model/stats").onSnapshot(s=>{ modelStats = s.exists ? s.data() : null; renderProfit(); }, ()=>{});
-  db.doc("market/" + todayET()).onSnapshot(s=>{ market = s.exists ? Object.assign({_id:s.id}, s.data()) : null; renderBuilder(); renderToday(); }, ()=>{});
+  // Follow today's price snapshot, and switch to the new day's after midnight ET.
+  let marketDay = null, marketOff = null;
+  const watchMarket = ()=>{
+    const d = todayET(); if(d === marketDay) return;
+    marketDay = d; if(typeof marketOff === "function") marketOff();
+    marketOff = db.doc("market/" + d).onSnapshot(s=>{ market = s.exists ? Object.assign({_id:s.id}, s.data()) : null; renderBuilder(); renderToday(); }, ()=>{});
+  };
+  watchMarket(); setInterval(watchMarket, 60000);
   db.collection("changelog").orderBy("at","desc").limit(10).onSnapshot(snap=>{
     if(snap.empty) return;
     const ul = $("changes"); ul.replaceChildren();

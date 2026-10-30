@@ -46,7 +46,8 @@ land side by side, which is the "high win % *and* high payout" trade-off.
 6. **Market first**: each leg also gets `marketEv`, its value by the sharp
    no-vig price alone. No leg priced more than 2% worse than that is used
    anywhere (`MARKET_FLOOR`); full-tier tickets, the board and payout plays must
-   be worth at least break-even by the market alone (leans: -2%). Through 10/29
+   be worth at least break-even by the market alone, leans included. Only
+   real two-sided sharp prices (`sharpOdds`) count as sharp. Through 10/29
    the stat-driven picks hit 58% of legs against 65% expected, and FanDuel's
    juiced unders sat 4-5% worse than Pinnacle.
 

@@ -69,10 +69,15 @@ def hit_rate_text(hit_rates):
 def fair_of(c):
     """(fair probability, flagged-as-thin). Needs both sides of a market."""
     if len(c.get("sharpOdds") or []) >= 2:
+        if sum(om.implied(o) for o in c["sharpOdds"]) <= 1:
+            # Two sides that add up to 100% or less aren't one market (a stale
+            # side or mismatched lines), so there's no fair price to trust.
+            raise ValueError("sharp prices don't form one market")
         return om.fair_prob(c["sharpOdds"]), False
     if c.get("fairProb") is not None:
-        # A hand-made fair estimate only counts as sharp if it names its source.
-        return float(c["fairProb"]), bool(c.get("fairFlag", not c.get("sharpSource")))
+        # Only real two-sided sharp prices count as sharp; a typed-in fair
+        # estimate can't be checked, so it is always thin (leans at most).
+        return float(c["fairProb"]), True
     # No sharp price at all: fall back to FanDuel's own two sides if given.
     if len(c.get("bookOdds") or []) >= 2:
         return om.fair_prob(c["bookOdds"]), True

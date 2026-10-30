@@ -31,12 +31,13 @@ BOARD = dict(min_prob=0.50, min_market_ev=0.0)
 BOOST_MIN_JOINT = 0.25
 BOOST_MIN_MARKET_EV = 0.0
 # The lower "lean" bar, used only when nothing clears the full one (still positive value).
-LEAN_BIG = dict(min_prob=0.55, min_edge=0.005, min_ev=0.005, min_odds=-400, max_odds=200, min_market_ev=-0.02)
-LEAN_PAIR = dict(min_leg_prob=0.55, min_joint=0.35, min_dec=1.7, max_dec=4.0, min_ev=0.005, min_market_ev=-0.02)
+LEAN_BIG = dict(min_prob=0.55, min_edge=0.005, min_ev=0.005, min_odds=-400, max_odds=200, min_market_ev=0.0)
+LEAN_PAIR = dict(min_leg_prob=0.55, min_joint=0.35, min_dec=1.7, max_dec=4.0, min_ev=0.005, min_market_ev=0.0)
 LEAN_PARLAY = dict(min_payout10=15.0, min_ev=0.0, min_odds=-600, max_odds=150, min_leg_edge=-0.005,
-                   min_market_ev=-0.02)
+                   min_market_ev=0.0)
 LONGSHOT = dict(min_prob=0.35, min_ev=0.03, min_odds=120, min_market_ev=0.0)
 SGP_MIN_JOINT = 0.12
+SGP_ODDS = (-300, 250)
 LEGS_BY_KIND = {"big": 1, "pair": 2, "parlay3": 3}
 BOOST_LEGS = (1, 4)   # a boost ticket may have 1 to 4 legs
 REQUIRED = ("sport", "game", "pick", "market", "type", "odds", "modelProb", "source")
@@ -72,6 +73,8 @@ def power_fair(odds):
     """No-vig chance of the first side, power method, solved here by bisection
     (its own code, not oddsmath's): find k with sum(implied_i ** k) = 1."""
     imps = [1 / dec(o) for o in odds]
+    if sum(imps) <= 1:
+        raise ValueError("sides add up to 100% or less: not one market")
     lo, hi = 0.5, 3.0
     for _ in range(80):
         k = (lo + hi) / 2
@@ -84,12 +87,10 @@ def power_fair(odds):
 
 def sharp_fair(l):
     """(fair chance from the leg's own sharp prices, or None)."""
-    if l.get("fairFlag"):
-        return None
+    # Sharp means both raw sharp prices are on the leg, whatever its flags say.
     so = l.get("sharpOdds") or []
     if len(so) < 2:
-        # A sourced fair estimate without both raw prices: same as the builder.
-        return l.get("fairProb") if l.get("fairFlag") is False else None
+        return None
     try:
         return power_fair(so)
     except (TypeError, ValueError, ZeroDivisionError):
@@ -145,6 +146,14 @@ def check_leg(r, l, where, never_against, now, legacy=False, books=None):
     if l.get("fairProb") is None and not legacy:
         r.fail("no-fair", f"{where}: no market fair price; stats-only legs can't post")
     f = sharp_fair(l)
+    so = l.get("sharpOdds") or []
+    if not legacy:
+        if l.get("fairFlag") is False and len(so) < 2 and l.get("fairProb") is not None:
+            r.fail("unverifiable-sharp", f"{where}: claims a sharp fair price but has no two-sided sharp prices to check")
+        if len(so) >= 2 and f is None:
+            r.fail("sharp-market", f"{where}: sharp prices {so} don't form one market")
+        if f is not None and l.get("fairFlag"):
+            r.fail("flag-mismatch", f"{where}: has two-sided sharp prices but is flagged thin")
     if f is not None and not legacy:
         if l.get("fairProb") is not None and abs(l["fairProb"] - f) > 0.003:
             r.fail("fair-math", f"{where}: fairProb {l['fairProb']} but the sharp prices {l.get('sharpOdds')} make {f:.3f}")
@@ -249,14 +258,14 @@ def check_ticket(tid, t, never_against, now=None, books=None):
             floor = BOOST_MIN_MARKET_EV
         fairs = [sharp_fair(l) for l in legs]
         if None in fairs:
-            if floor is not None and floor >= 0:
-                r.fail("market-value", "a full-tier ticket needs a sharp price on every leg")
+            if floor is not None:
+                r.fail("market-value", "every posted ticket needs a sharp two-sided price on every leg")
         else:
             mwin = math.prod(fairs)
             me = mwin * d - 1
             if t.get("marketEv") is not None and abs(t["marketEv"] - me) > TOL_EV:
                 r.fail("market-math", f"marketEv {t['marketEv']} but sharp chances x payout - 1 = {me:+.3f}")
-            if floor is not None and me < floor - EPS:
+            if floor is not None and me < floor:
                 r.fail("market-value", f"worth {me:+.1%} by the sharp market alone; needs {floor:+.1%}")
         if kind == "big":
             l, o = legs[0], float(legs[0]["odds"])
@@ -305,8 +314,20 @@ def check_sgp(r, t, where, never_against, now, books):
         check_leg(r, l, f"{where} leg {i + 1}", never_against, now, books=books)
     if len({rules.game_key(l.get("game", "")) for l in legs}) != 1:
         r.fail("sgp-games", f"{where}: legs must all come from one game")
-    if len({l.get("book") for l in legs}) != 1:
-        r.fail("sgp-book", f"{where}: legs must all be at one book")
+    if len({l.get("book") for l in legs}) != 1 or t.get("book") not in {l.get("book") for l in legs}:
+        r.fail("sgp-book", f"{where}: legs must all be at the build's one book")
+    out = [sgn(l.get("odds")) for l in legs if not SGP_ODDS[0] <= float(l.get("odds") or 0) <= SGP_ODDS[1]]
+    if out:
+        r.fail("sgp-odds-range", f"{where}: legs must be {SGP_ODDS[0]} to +{SGP_ODDS[1]}: {out}")
+    if not t.get("breakEven"):
+        r.fail("sgp-break-even", f"{where}: missing break-even prices")
+    dirs = {}
+    for l in legs:
+        ty = str(l.get("type", ""))
+        if ty.startswith("prop "):
+            dirs.setdefault(l.get("team"), set()).add(ty.split()[-1])
+    if any(len(d) > 1 for d in dirs.values()):
+        r.fail("sgp-opposed", f"{where}: an over and an under on the same team's players pull against each other")
     players = [l.get("player") for l in legs if l.get("player")]
     if len(players) != len(set(players)):
         r.fail("sgp-player", f"{where}: the same player twice")
@@ -361,7 +382,7 @@ def audit(obj, never_against, now=None, books=None):
             if l["modelProb"] < BOARD["min_prob"] - EPS:
                 br.fail("board-prob", f"board {i + 1}: under 50% to win")
             mv = market_value(l)
-            if mv is None or mv < BOARD["min_market_ev"] - EPS:
+            if mv is None or mv < BOARD["min_market_ev"]:
                 br.fail("board-market", f"board {i + 1}: FanDuel's price isn't at least the sharp fair price")
     if board:
         reports.append(br)
@@ -374,7 +395,7 @@ def audit(obj, never_against, now=None, books=None):
                     or l["modelProb"] * ld - 1 < LONGSHOT["min_ev"] - EPS:
                 lr.fail("longshot-bar", f"payout play {i + 1} needs +120 or longer, 35%+ to win and +3% value")
             mv = market_value(l)
-            if mv is None or mv < LONGSHOT["min_market_ev"] - EPS:
+            if mv is None or mv < LONGSHOT["min_market_ev"]:
                 lr.fail("longshot-market", f"payout play {i + 1}: FanDuel's price isn't at least the sharp fair price")
     if lr.items:
         reports.append(lr)
