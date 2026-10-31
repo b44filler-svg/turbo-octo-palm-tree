@@ -119,7 +119,7 @@ changes. `fetch_report.json` has counts, injury drops and any feed failures.
 ## Books, closing lines, market weight (10/31)
 
 - `--books` reads each book's **Pennsylvania** board in the Action Network feed
-  (FanDuel 255, BetMGM 280, Caesars 1906, Fanatics 2791, bet365 3547, BetRivers 122);
+  (FanDuel 255, DraftKings 1534, BetMGM 280, Caesars 1906, Fanatics 2791, bet365 3547, BetRivers 122);
   a leg's `prices` lists every book posting the same number Pinnacle prices, and
   singles take the best. Courtside has no public feed.
 - `--close legs.json` records closing lines for posted legs whose game starts within

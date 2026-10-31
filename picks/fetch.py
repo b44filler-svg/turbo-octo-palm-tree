@@ -2,8 +2,8 @@
 
 Sources (all public JSON, stdlib only):
   Pinnacle guest API   sharp two-sided prices: game lines and NBA/MLB props
-  Action Network feed  Pennsylvania prices at Bob's books (FanDuel, BetMGM, Caesars,
-                       Fanatics, bet365, BetRivers) for game lines and NBA/NFL props,
+  Action Network feed  Pennsylvania prices at Bob's books (FanDuel, DraftKings, BetMGM,
+                       Caesars, Fanatics, bet365, BetRivers) for game lines and NBA/NFL props,
                        plus true tip times
   ESPN                 NBA and NFL game logs (this season and last) and injury reports
 
@@ -38,7 +38,7 @@ ESPN = "https://site.api.espn.com/apis/site/v2/sports"
 ESPN_LOGS = "https://site.web.api.espn.com/apis/common/v3/sports"
 FANDUEL_BOOK = "69"   # FanDuel's NJ board: the old default, kept for the offline tests
 # Pennsylvania boards in the Action Network feed (from /web/v1/books).
-PA_BOOKS = {"FanDuel": "255", "BetMGM": "280", "Caesars": "1906", "Fanatics": "2791",
+PA_BOOKS = {"FanDuel": "255", "DraftKings": "1534", "BetMGM": "280", "Caesars": "1906", "Fanatics": "2791",
             "bet365": "3547", "BetRivers": "122"}
 LEAGUES = {"NBA": (487, "nba", "basketball/nba"),
            "MLB": (246, "mlb", "baseball/mlb"),

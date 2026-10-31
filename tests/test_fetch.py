@@ -235,3 +235,7 @@ def test_closing_lines_for_games_about_to_start():
     assert heat["closeOdds"] == 100 and heat["clv"] > 0              # took +110, closed +100
     assert heat["closeSharp"] == [-105, -115] and heat["clvSharp"] > 0 and heat["minutesBefore"] == 40
     assert "closeOdds" not in rows[1] and "moved" in rows[1]["closeNote"]
+
+
+def test_pa_boards_include_draftkings():
+    assert fetch.PA_BOOKS["FanDuel"] == "255" and fetch.PA_BOOKS["DraftKings"] == "1534"
