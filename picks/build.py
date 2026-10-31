@@ -435,11 +435,16 @@ MARKET_FIELDS = ("sport", "game", "start", "startISO", "pick", "market", "type",
 
 
 def market_snapshot(by_book, sgp, date, book="FanDuel"):
-    """Every sharp-priced leg at the book, for the app's parlay checker (doc market/<date>)."""
-    legs = [{k: l.get(k) for k in MARKET_FIELDS if l.get(k) is not None}
-            for l in by_book.get(book, []) if sharp(l)]
-    legs.sort(key=lambda l: (l["game"], -l["marketEv"]))
-    return {"date": date, "book": book, "legs": legs, "sgp": sgp}
+    """Every sharp-priced leg at the book, for the app's parlay checker (doc market/<date>).
+    `byBook` holds the same for each of Bob's books, so a price scan can check a
+    board bet at the book it names."""
+    def rows(b):
+        out = [{k: l.get(k) for k in MARKET_FIELDS if l.get(k) is not None}
+               for l in by_book.get(b, []) if sharp(l)]
+        out.sort(key=lambda l: (l["game"], -l["marketEv"]))
+        return out
+    return {"date": date, "book": book, "legs": rows(book), "sgp": sgp,
+            "byBook": {b: rows(b) for b in sorted(by_book)}}
 
 
 def build_all(candidates, date, settings=None, stats=None, boosts_in=None):

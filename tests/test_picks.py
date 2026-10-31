@@ -709,3 +709,13 @@ def test_rounding_never_lets_a_losing_market_value_through():
         for l in res["board"]:
             assert build.mev(l) >= 0
         assert not [r for r in audit.audit(res, EAGLES, NOW) if r.status == "FAIL"]
+
+
+def test_market_snapshot_lists_every_book():
+    legs = [{"sport": "NBA", "game": "A @ B", "pick": "A ML", "type": "moneyline", "market": "Moneyline",
+             "team": "A", "start": "7:00 PM ET", "startISO": "2030-01-01T00:00:00Z",
+             "prices": {"FanDuel": 120, "DraftKings": 125}, "sharpOdds": [110, -130], "source": "x"}]
+    res = build.build_all(legs, "2030-01-01", {"neverAgainst": EAGLES, "books": ["FanDuel", "DraftKings"]})
+    by = res["market"]["byBook"]
+    assert by["FanDuel"][0]["odds"] == 120 and by["DraftKings"][0]["odds"] == 125
+    assert res["market"]["legs"] == by["FanDuel"]
