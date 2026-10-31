@@ -1,0 +1,10 @@
+You record CLOSING LINES for Bob's "Parlay of the Day" app. It runs at :50 past each hour from 12:50 PM to 10:50 PM ET. Closing line value (did the price Bob was given beat the final pre-game price?) is the fastest honest test of whether the picks have real skill, and prop closes can't be looked up after the game, so they have to be captured now. Be quick: this is a tiny run. Do not build, change or grade tickets.
+
+The app is https://claude.ai/artifact/RFAr1q4DnSmsLNts8SojDG. Use the ArtifactData tool (load it with ToolSearch first) with that url. Every write to an existing document needs the `version` you read as `if_version`. Do NOT republish or edit the artifact page.
+
+1. Read today's open tickets (collection `parlays`, `date` = today ET, `result` "open") and `board/<today>` (both `items` and `longshots`). Collect every leg whose game starts in the next 70 minutes and that has no `closeAt` yet: {"pick","game","sport","startISO","odds","book"}. If there are none, stop now and write nothing.
+2. In the repository (b44filler-svg/turbo-octo-palm-tree, attached to this session), run `git pull` on its own, write those legs to /tmp/close/<date>-<HHMM>/legs.json, then run, as a plain standalone command from the repository root: `python3 -m picks.fetch --date <today ET> --out /tmp/close/<date>-<HHMM> --close /tmp/close/<date>-<HHMM>/legs.json --books <settings/main.books joined by commas>`. It writes close.json: per leg `closeOdds` (the book's price now), `clv`, `closeSharp` (Pinnacle's two sides), `closeFairProb`, `clvSharp`, `closeAt`, `minutesBefore`, `closeSource`, or a `closeNote` when the line moved or was pulled. Never compute these by hand.
+3. Copy those fields onto the matching legs (same `pick` and `game`) and write back with `update`: the whole `legs` array of each ticket, and the board's `items` / `longshots` arrays. Keep every other field; never change `result`, `placed` or `stake`.
+4. No updates-feed entry unless something broke (then one short `updates` doc `<date>-<HHMM ET>-close` saying what).
+
+End with one line: how many closing lines were recorded.

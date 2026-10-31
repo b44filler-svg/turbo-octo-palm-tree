@@ -5,7 +5,7 @@ The app is the artifact https://claude.ai/artifact/RFAr1q4DnSmsLNts8SojDG. Use t
 JOB 1 - Grade old picks and measure closing line value.
 List `parlays`. For every document whose `result` is "open" and whose games have all finished:
 - Look up final scores and box-score stats. Set each leg's `result` ("won", "lost" or "void") and `actual` (e.g. "14 reb").
-- Look up each leg's closing price for the same line at the book the leg names (`book`, FanDuel if missing), or the closing consensus price if that book's close isn't findable; say which in `closeSource`. Set `closeOdds` and `clv` = implied_prob(closeOdds) - implied_prob(odds), rounded to 3 decimals (positive means the pick beat the closing line).
+- Closing line value. Most legs already carry a pre-game snapshot from the hourly close task (`closeOdds`, `clv`, `closeSharp`, `closeFairProb`, `clvSharp`, `closeSource` naming the time): keep those as they are. Only for a leg without them, look up its closing price for the same line at the book the leg names (`book`, FanDuel if missing), or the closing consensus price if that book's close isn't findable; say which in `closeSource`. Set `closeOdds` and `clv` = implied_prob(closeOdds) - implied_prob(odds), rounded to 3 decimals (positive means the pick beat the closing line); if you also find Pinnacle's closing two-sided price, set `closeSharp` and `clvSharp` = Pinnacle's no-vig chance at the close minus implied_prob(odds).
 - Set the document's `result` ("won" if every non-void leg won, "lost" if any leg lost; "void" if every leg is void; a pair or parlay with some void legs is graded on the rest, so a pair left with one winning leg is "won") and `finalNote` (one short line).
 - Write the whole `legs` array with `update`, keeping every other field (like `placed`, `stake`, `lateCheck`, `audit`).
 Also grade every item in `board` documents (both `items` and `longshots`) whose games have finished: set each item's `result` and `actual`, and write those arrays back with `update`.
@@ -18,8 +18,10 @@ Read `model/stats` (create it if missing). From every graded leg in `parlays` an
  "byType":[{"type":"prop over","legs":N,"hit":N},{"type":"prop under",...},{"type":"spread",...},{"type":"moneyline",...},{"type":"total over",...},{"type":"total under",...}],
  "bySport":[{"sport":"NBA","legs":N,"hit":N,"tickets":N,"ticketsWon":N},...],
  "byKind":[{"kind":"big","tickets":N,"won":N,"expected":x},{"kind":"pair",...},{"kind":"parlay3",...},{"kind":"boost",...},{"kind":"lean","tickets":N,"won":N,"expected":x},{"kind":"longshot",...},{"kind":"board","tickets":N,"won":N,"expected":x}],
+ "avgClvSharp":x,"beatSharpCloseRate":x,"clvLegs":N,
  "auditFixes":N,"shrink":<market weight to use next>,"lesson":"one sentence on what the results say so far"}
-shrink starts at 0.5. Once a bucket has 30+ legs: if actual trails expected by more than 5 points, raise shrink by 0.05 (max 0.8); if actual beats expected by more than 5 points and avgClv > 0, lower it by 0.05 (min 0.35). Never change it by more than 0.05 per day.
+avgClvSharp / beatSharpCloseRate use only legs with `clvSharp`; clvLegs is how many. Beating Pinnacle's close is the best early sign of real skill, so name it in the lesson once clvLegs reaches 20.
+shrink is the market's weight in the model. It was raised from 0.5 to 0.7 on 10/31 because stat-driven legs were hitting 52% against 63% expected. Once a bucket has 30+ legs: if actual trails expected by more than 5 points, raise shrink by 0.05 (max 0.85); if actual beats expected by more than 5 points and avgClvSharp > 0 over 20+ clvLegs, lower it by 0.05 (min 0.5). Never change it by more than 0.05 per day.
 
 UPDATES FEED. The app shows a timeline of what each run did. At the end, `set` one document in collection `updates` with id `<date>-<HHMM ET>-grading`: {"at":"<ISO now>","date":"<today ET>","kind":"grading","title":"short, plain words","detail":"one or two plain sentences Bob can act on"}. Title like "Graded last night: 3 of 5 bets won"; detail names the winners and losers and the model/stats lesson. If nothing needed grading, still write one short update.
 

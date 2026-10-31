@@ -489,6 +489,18 @@ def test_thin_day_still_posts_leans():
     assert [r.tid for r in audit.audit(res, EAGLES, NOW) if r.status == "FAIL"] == []
 
 
+def test_no_lean_3_leg_parlays():
+    # Plain 3-leg parlays compound the vig; they post only when they clear the full bar.
+    res = build.build_all(thin_day(), "2026-10-27", {"neverAgainst": EAGLES})
+    assert all(t.get("tier") != "lean" for t in res["parlays"].values())
+
+
+def test_market_weight_defaults_to_seventy_percent():
+    res = build.build_all(thin_day(), "2026-10-27", {"neverAgainst": EAGLES})
+    assert res["shrink"] == 0.7
+    assert build.build_all(thin_day(), "2026-10-27", {"neverAgainst": EAGLES}, {"shrink": 0.6})["shrink"] == 0.6
+
+
 def test_leans_never_replace_full_picks(built):
     assert "tier" not in built["big"]
     assert all("tier" not in t for t in built["pairs"] + list(built["parlays"].values()))

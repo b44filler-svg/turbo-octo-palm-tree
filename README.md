@@ -116,12 +116,24 @@ games when a player's minutes moved more than 25% (`roleNote`), and lists
 teammates who are out (`teammatesOut`) so research can adjust for role
 changes. `fetch_report.json` has counts, injury drops and any feed failures.
 
+## Books, closing lines, market weight (10/31)
+
+- `--books` reads each book's **Pennsylvania** board in the Action Network feed
+  (FanDuel 255, BetMGM 280, Caesars 1906, Fanatics 2791, bet365 3547, BetRivers 122);
+  a leg's `prices` lists every book posting the same number Pinnacle prices, and
+  singles take the best. Courtside has no public feed.
+- `--close legs.json` records closing lines for posted legs whose game starts within
+  70 minutes (`prompts/close-snapshot.md`, run hourly at :50): `clv` against the
+  book's close and `clvSharp` against Pinnacle's no-vig close, the truer skill test.
+- The market weight (`shrink`) defaults to 0.7: through 10/30 the stat-driven legs
+  hit 52% against 63% expected. Plain 3-leg parlays have no lean tier.
+
 ## Run it
 
 ```bash
 python -m picks.build tests/fixtures/candidates.json --date 2026-10-27 --settings tests/fixtures/settings.json --out draft.json
 python -m picks.audit draft.json --settings tests/fixtures/settings.json
-python3 -m picks.fetch --date 2026-10-28 --out /tmp/picks   # live prices + stats
+python3 -m picks.fetch --date 2026-10-28 --out /tmp/picks --books FanDuel,BetMGM   # live prices + stats
 python3 -m picks.selftest                           # quick check, no installs (the daily task runs this)
 python -m pytest -q                                 # full engine + auditor tests
 NODE_PATH=$(npm root -g) node tests/page_test.js    # app page in Chromium with a mocked database

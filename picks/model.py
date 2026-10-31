@@ -97,7 +97,7 @@ def clip(x, lim):
     return max(-lim, min(lim, float(x or 0)))
 
 
-def score(c, shrink=0.5):
+def score(c, shrink=0.7):
     """Return a copy of candidate `c` with model fields filled in."""
     leg = dict(c)
     odds = int(c["odds"])

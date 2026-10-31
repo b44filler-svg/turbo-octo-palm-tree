@@ -1,4 +1,6 @@
 """picks.fetch parsing and matching, on small offline copies of each feed."""
+from datetime import datetime, timezone
+
 from picks import build, fetch
 
 MATCHUPS = [
@@ -169,3 +171,67 @@ def test_nfl_questionable_status_is_blocked():
 def test_star_flags():
     assert fetch.is_star("Passing Yards", 265.5) and fetch.is_star("Receiving Yards", 74.5)
     assert not fetch.is_star("Receptions", 6.5) and not fetch.is_star("Points", 12.5)
+
+
+# ---------- several Pennsylvania books ----------
+
+def v2_row(typ, side, odds, value=0, team_id=None):
+    return {"type": typ, "side": side, "odds": odds, "value": value, "team_id": team_id,
+            "is_alt_market": False, "is_live": False}
+
+
+BOARD_V2 = {"games": [{
+    "status": "scheduled", "start_time": "2026-10-28T23:00:00.000Z",
+    "away_team_id": 160, "home_team_id": 159, "teams": TEAMS,
+    "markets": {
+        "255": {"event": {"moneyline": [v2_row("moneyline", "away", 106), v2_row("moneyline", "home", -124)],
+                          "total": [v2_row("total", "over", -110, 241.5), v2_row("total", "under", -110, 241.5)]}},
+        "3547": {"event": {"moneyline": [v2_row("moneyline", "away", 112), v2_row("moneyline", "home", -130)],
+                           "total": [v2_row("total", "over", -105, 240.5), v2_row("total", "under", -115, 240.5)]}},
+        "15": {"event": {"moneyline": [v2_row("moneyline", "away", 999)]}}}}]}
+
+
+def test_lines_merge_prices_from_every_book_with_the_same_number():
+    rows = fetch.parse_pinnacle(MATCHUPS, MARKETS, "NBA")
+    legs = fetch.match_lines_books(BOARD_V2, rows, "NBA", {"FanDuel": "255", "bet365": "3547"})
+    by_pick = {x["pick"]: x for x in legs}
+    assert by_pick["Miami Heat ML"]["prices"] == {"FanDuel": 106, "bet365": 112}
+    assert by_pick["Miami Heat ML"]["sharp"] == [110, -130]
+    # bet365's 240.5 total has no Pinnacle match; FanDuel's 241.5 does
+    assert by_pick["Under 241.5"]["prices"] == {"FanDuel": -110} and "Under 240.5" not in by_pick
+    cands = fetch.line_candidates(legs)
+    heat = next(c for c in cands if c["pick"] == "Miami Heat ML")
+    assert heat["why"].endswith("vs bet365 +112.")          # the book that pays most
+    best, _, _ = build.prepare(cands, 0.7, ["Philadelphia Eagles"], ["FanDuel", "bet365"])
+    assert next(l for l in best if l["pick"] == "Miami Heat ML")["book"] == "bet365"
+    fd_only, _, _ = build.prepare(cands, 0.7, ["Philadelphia Eagles"], ["FanDuel"])
+    assert next(l for l in fd_only if l["pick"] == "Miami Heat ML")["odds"] == 106
+
+
+def test_props_take_prices_from_other_books():
+    rows = fetch.parse_pinnacle(MATCHUPS, MARKETS, "NBA")
+    pin, tips = fetch.pinnacle_props(rows), fetch.tip_times(SCOREBOARD)
+    key = ("jalenjohnson", "Rebounds", 9.5)
+    other = {key: {"player": "Jalen Johnson", "team": "Atlanta Hawks", "over": -120, "under": 100}}
+    cands, _ = fetch.prop_candidates(pin, {}, tips, {}, {}, {}, others={"Fanatics": other})
+    assert [c["prices"] for c in cands] == [{"Fanatics": -120}]   # FanDuel doesn't post it
+    fd = fetch.fanduel_props(PROP_FEED, "Rebounds")
+    cands, _ = fetch.prop_candidates(pin, fd, tips, {}, {}, {}, others={"Fanatics": other})
+    assert cands[0]["prices"] == {"FanDuel": -130, "Fanatics": -120}
+
+
+def test_closing_lines_for_games_about_to_start():
+    cands = [{"game": "Miami Heat @ Atlanta Hawks", "pick": "Miami Heat ML",
+              "prices": {"FanDuel": 100}, "sharpOdds": [-105, -115]}]
+    posted = [{"pick": "Miami Heat ML", "game": "Miami Heat @ Atlanta Hawks", "odds": 110,
+               "book": "FanDuel", "startISO": "2026-10-28T23:00:00Z"},
+              {"pick": "Gone Over 9.5", "game": "Miami Heat @ Atlanta Hawks", "odds": -110,
+               "startISO": "2026-10-28T23:00:00Z"},
+              {"pick": "Later ML", "game": "X @ Y", "odds": -110, "startISO": "2026-10-29T02:00:00Z"}]
+    now = datetime(2026, 10, 28, 22, 20, tzinfo=timezone.utc)      # 40 minutes before tip
+    rows = fetch.closing_lines(posted, cands, now)
+    assert [r["pick"] for r in rows] == ["Miami Heat ML", "Gone Over 9.5"]   # the 10 PM game is too far off
+    heat = rows[0]
+    assert heat["closeOdds"] == 100 and heat["clv"] > 0              # took +110, closed +100
+    assert heat["closeSharp"] == [-105, -115] and heat["clvSharp"] > 0 and heat["minutesBefore"] == 40
+    assert "closeOdds" not in rows[1] and "moved" in rows[1]["closeNote"]

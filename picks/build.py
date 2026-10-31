@@ -10,7 +10,8 @@ Bet types it produces:
            (high win chance, real edge, low variance)
   pair     Power Pairs: 2-leg parlays of legs that are too juiced to bet alone
            but pay about even money or better together
-  parlay3  the classic 3-leg parlay per sport, closest to a lock
+  parlay3  the classic 3-leg parlay per sport, closest to a lock (full bar only:
+           a plain parlay compounds the vig, so there is no lean version)
   boost    the best use of each sportsbook promo (profit boosts), with the
            boosted payout
   sgp      Same Game Parlay builder: per game, the 3 legs the book prices best
@@ -61,8 +62,11 @@ SGP = dict(min_joint=0.12, min_odds=-300, max_odds=250, pool=12, min_leg_edge=-0
 LEAN_BIG = dict(min_prob=0.55, min_edge=0.005, min_ev=0.005, min_odds=-400, max_odds=200, min_market_ev=0.0)
 LEAN_PAIR = dict(min_leg_prob=0.55, min_leg_edge=-0.005, min_joint=0.35,
                  min_dec=1.7, max_dec=4.0, min_ev=0.005, count=1, min_market_ev=0.0)
+# Kept so picks.audit can still check lean parlays posted before 10/31; the
+# builder no longer makes them (3-leg parlays went 1 for 6 through 10/30).
 LEAN_PARLAY = dict(min_payout10=15.0, min_ev=0.0, min_leg_edge=-0.005, soft_leg_edge=-0.015,
                    min_odds=-600, max_odds=150, min_market_ev=0.0)
+DEFAULT_SHRINK = 0.7   # market weight when model/stats has none (stats ran 52% vs 63% expected)
 # Payout plays: plus-money singles with real value, for a bigger payout.
 LONGSHOT = dict(min_prob=0.35, min_ev=0.03, min_odds=120, count=5, min_market_ev=0.0)
 
@@ -445,7 +449,7 @@ def build_all(candidates, date, settings=None, stats=None, boosts_in=None):
         # Never build without the loyalty rule; an empty list must be explicit.
         raise ValueError("settings need a `neverAgainst` list (use [] for none)")
     stats = (stats or {}).get("data", stats)
-    shrink = float((stats or {}).get("shrink", 0.5))
+    shrink = float((stats or {}).get("shrink", DEFAULT_SHRINK))
     books = settings.get("books") or []
     legs, by_book, dropped = prepare(candidates, shrink, settings["neverAgainst"], books)
     board = build_board(legs)
@@ -456,9 +460,6 @@ def build_all(candidates, date, settings=None, stats=None, boosts_in=None):
     parlays, top5 = {}, {}
     for sport in sorted({str(l["sport"]).upper() for l in legs}):
         options = [r for r in (build_parlay(bl, date, sport) for bl in by_book.values()) if r[0]]
-        if not options:
-            options = [(lean(r[0]), r[1]) for r in
-                       (build_parlay(bl, date, sport, LEAN_PARLAY) for bl in by_book.values()) if r[0]]
         if options:
             # Closest to a lock first; between books within 2 points, the bigger payout.
             top = max(o[0]["winChance"] for o in options)

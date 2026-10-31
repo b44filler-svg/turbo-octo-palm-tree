@@ -2,14 +2,20 @@
 
 Sources (all public JSON, stdlib only):
   Pinnacle guest API   sharp two-sided prices: game lines and NBA/MLB props
-  Action Network feed  FanDuel prices (book 69) for game lines and NBA/NFL props,
+  Action Network feed  Pennsylvania prices at Bob's books (FanDuel, BetMGM, Caesars,
+                       Fanatics, bet365, BetRivers) for game lines and NBA/NFL props,
                        plus true tip times
   ESPN                 NBA and NFL game logs (this season and last) and injury reports
 
-    python3 -m picks.fetch --date 2026-10-28 --out /tmp/picks/2026-10-28
+    python3 -m picks.fetch --date 2026-10-28 --out /tmp/picks/2026-10-28 [--books FanDuel,BetMGM]
+    python3 -m picks.fetch --date 2026-10-28 --out /tmp/close --close legs.json [--within 70]
 
 Writes <out>/candidates.json and <out>/fetch_report.json (counts, failures,
 injuries). Research still adds news, expert views and role adjustments.
+
+--close takes a JSON list of posted legs ({"pick","game","startISO","odds","book"})
+and writes <out>/close.json: each leg whose game starts within --within minutes
+gets the current price at its book and Pinnacle's, i.e. its closing line.
 """
 import argparse
 import json
@@ -30,7 +36,10 @@ PINNACLE = "https://guest.api.arcadia.pinnacle.com/0.1"
 ACTION = "https://api.actionnetwork.com/web"
 ESPN = "https://site.api.espn.com/apis/site/v2/sports"
 ESPN_LOGS = "https://site.web.api.espn.com/apis/common/v3/sports"
-FANDUEL_BOOK = "69"
+FANDUEL_BOOK = "69"   # FanDuel's NJ board: the old default, kept for the offline tests
+# Pennsylvania boards in the Action Network feed (from /web/v1/books).
+PA_BOOKS = {"FanDuel": "255", "BetMGM": "280", "Caesars": "1906", "Fanatics": "2791",
+            "bet365": "3547", "BetRivers": "122"}
 LEAGUES = {"NBA": (487, "nba", "basketball/nba"),
            "MLB": (246, "mlb", "baseball/mlb"),
            "NFL": (889, "nfl", "football/nfl")}
@@ -66,7 +75,7 @@ STAT_ABBR = {"Points": "pts", "Rebounds": "reb", "Assists": "ast",
 ESPN_SPORT = {"NBA": ("basketball/nba", False, 0), "NFL": ("football/nfl", True, -1)}
 ROLE_CHANGE = 0.25       # minutes moved this much: last season's games don't compare
 MIN_PROP_EV = -0.05      # props this far under the sharp price aren't worth listing
-SOURCE = "Action Network odds feed (FanDuel); sharp: Pinnacle"
+SOURCE = "Action Network odds feed (PA books); sharp: Pinnacle"
 
 
 def get(url, failures=None, tries=3):
@@ -159,14 +168,18 @@ def pinnacle_props(rows):
 # ---------- Action Network (FanDuel) ----------
 
 def fanduel_props(feed, stat):
-    """{(player, stat, line): {"player","team","over","under"}} from one prop feed."""
+    return book_props(feed, stat, FANDUEL_BOOK)
+
+
+def book_props(feed, stat, book_id):
+    """{(player, stat, line): {"player","team","over","under"}} for one book in a prop feed."""
     teams = {}
     for g in feed.get("games", []):
         for side in ("home_team", "away_team"):
             teams[g[side]["id"]] = g[side]["full_name"]
     players = {p["id"]: p for p in feed.get("players", [])}
     out = {}
-    book = (feed.get("markets") or {}).get(FANDUEL_BOOK) or {}
+    book = (feed.get("markets") or {}).get(str(book_id)) or {}
     for rows in book.get("event", {}).values():
         for x in rows:
             p = players.get(x.get("player_id"))
@@ -249,6 +262,88 @@ def match_lines(scoreboard, pin_rows, sport):
             if x:
                 leg("team total over", team, f"{team} Over {pts:g} team pts", fd.get(side + "_over"), (x.get("over"), x.get("under")))
                 leg("team total under", team, f"{team} Under {pts:g} team pts", fd.get(side + "_under"), (x.get("under"), x.get("over")))
+    return legs
+
+
+def pinnacle_sharp(pm, away, home, typ, pts=None, side=None):
+    """Pinnacle's two sides for one market and number, keyed by lowercase side name."""
+    for r in pm:
+        if r["type"] != typ:
+            continue
+        pr = {(p["name"] or "").lower(): p for p in r["prices"]}
+        if typ == "moneyline":
+            return {k: v["price"] for k, v in pr.items()}
+        if typ == "spread" and pr.get(away.lower(), {}).get("points") == pts:
+            return {k: v["price"] for k, v in pr.items()}
+        if typ == "total" and r["prices"][0]["points"] == pts:
+            return {k: v["price"] for k, v in pr.items()}
+        if (typ == "team_total" and r["key"].endswith(side)
+                and r["prices"][0]["points"] == pts):
+            return {k: v["price"] for k, v in pr.items()}
+    return None
+
+
+def match_lines_books(board, pin_rows, sport, books):
+    """Like match_lines, from the v2 scoreboard (periods=event), for several books:
+    each leg carries `prices` {book: odds} from every book posting that exact
+    number, as long as Pinnacle prices the same number."""
+    by_game = {}
+    for r in pin_rows:
+        if not r["special"]:
+            by_game.setdefault(game_key(r["game"]), []).append(r)
+    legs = []
+    for g in board.get("games", []):
+        t = {x["id"]: x["full_name"] for x in g["teams"]}
+        away, home = t[g["away_team_id"]], t[g["home_team_id"]]
+        pm = by_game.get((nickname(away), nickname(home)))
+        if not pm:
+            continue
+        a, h = away.lower(), home.lower()
+        side_team = {g["away_team_id"]: ("away", away), g["home_team_id"]: ("home", home)}
+        found = {}
+
+        def add(book, typ, team, pick, odds, pair):
+            if odds is None or not pair or None in pair:
+                return
+            x = found.setdefault(pick, {"sport": sport, "game": f"{away} @ {home}",
+                                        "startISO": g["start_time"], "type": typ, "pick": pick,
+                                        "sharp": list(pair), "prices": {}})
+            if team:
+                x["team"] = team
+            x["prices"][book] = odds
+
+        for book, bid in books.items():
+            rows = ((g.get("markets") or {}).get(str(bid)) or {}).get("event", {})
+            for typ, items in rows.items():
+                for r in items:
+                    if r.get("is_alt_market") or r.get("is_live"):
+                        continue
+                    odds, val, sd = r.get("odds"), r.get("value"), r.get("side")
+                    if typ == "moneyline":
+                        ml = pinnacle_sharp(pm, away, home, "moneyline")
+                        if ml and sd in ("away", "home"):
+                            me, other = (a, h) if sd == "away" else (h, a)
+                            add(book, "moneyline", away if sd == "away" else home,
+                                f"{away if sd == 'away' else home} ML", odds, (ml.get(me), ml.get(other)))
+                    elif typ == "spread" and sd in ("away", "home") and val is not None:
+                        away_pts = val if sd == "away" else -val
+                        sp = pinnacle_sharp(pm, away, home, "spread", away_pts)
+                        if sp:
+                            team, me, other = (away, a, h) if sd == "away" else (home, h, a)
+                            add(book, "spread", team, f"{team} {val:+g}", odds, (sp.get(me), sp.get(other)))
+                    elif typ == "total" and sd in ("over", "under") and val is not None:
+                        tt = pinnacle_sharp(pm, away, home, "total", val)
+                        if tt:
+                            other = "under" if sd == "over" else "over"
+                            add(book, "total " + sd, None, f"{sd.title()} {val:g}", odds, (tt.get(sd), tt.get(other)))
+                    elif typ.endswith("_team_score") and sd in ("over", "under") and r.get("team_id") in side_team:
+                        which, team = side_team[r["team_id"]]
+                        x = pinnacle_sharp(pm, away, home, "team_total", val, which)
+                        if x:
+                            other = "under" if sd == "over" else "over"
+                            add(book, "team total " + sd, team, f"{team} {sd.title()} {val:g} team pts",
+                                odds, (x.get(sd), x.get(other)))
+        legs += found.values()
     return legs
 
 
@@ -384,11 +479,19 @@ def is_star(stat, line):
             or (stat in ("Rushing Yards", "Receiving Yards") and line >= 69.5))
 
 
-def prop_candidates(pin_props, fd_props, tips, logs, injuries, team_out, sport="NBA"):
+def prop_candidates(pin_props, fd_props, tips, logs, injuries, team_out, sport="NBA", others=None):
+    """Prop legs where Pinnacle prices the same line. `fd_props` is FanDuel's board;
+    `others` is {book: board} for Bob's other books. A leg's `prices` lists every
+    book posting both sides of that exact line."""
     cands, dropped = [], []
-    for k, fd in fd_props.items():
-        if k not in pin_props or "over" not in fd or "under" not in fd:
+    boards = {"FanDuel": fd_props or {}, **(others or {})}
+    keys = list(dict.fromkeys(k for b in boards.values() for k in b))
+    for k in keys:
+        at = {book: b[k] for book, b in boards.items()
+              if k in b and "over" in b[k] and "under" in b[k]}
+        if k not in pin_props or not at:
             continue
+        fd = next(iter(at.values()))
         p_over, p_under, game = pin_props[k]
         _, stat, line = k
         info = injuries.get(k[0])
@@ -401,10 +504,12 @@ def prop_candidates(pin_props, fd_props, tips, logs, injuries, team_out, sport="
         iso = tips.get(game_key(game))
         if not iso:
             continue
-        for side, odds, sharp in (("over", fd["over"], [p_over, p_under]),
-                                  ("under", fd["under"], [p_under, p_over])):
-            if not -500 <= odds <= 200:
+        for side, sharp in (("over", [p_over, p_under]), ("under", [p_under, p_over])):
+            prices = {book: x[side] for book, x in at.items() if -500 <= x[side] <= 200}
+            if not prices:
                 continue
+            book = best_book(prices)
+            odds = prices[book]
             fair = om.fair_prob(sharp)
             if om.ev(fair, odds) < MIN_PROP_EV:
                 continue
@@ -412,7 +517,7 @@ def prop_candidates(pin_props, fd_props, tips, logs, injuries, team_out, sport="
                  "start": to_et(iso), "startISO": to_z(iso),
                  "pick": f"{fd['player']} {side.title()} {line:g} {stat}", "market": stat,
                  "type": "prop " + side, "team": fd["team"], "player": fd["player"],
-                 "prices": {"FanDuel": odds}, "sharpOdds": sharp, "sharpSource": "Pinnacle",
+                 "prices": prices, "sharpOdds": sharp, "sharpSource": "Pinnacle",
                  "source": SOURCE, "star": is_star(stat, line), "adjust": 0.0}
             lg = logs.get(k[0])
             if lg and stat in STAT_KEYS:
@@ -421,10 +526,13 @@ def prop_candidates(pin_props, fd_props, tips, logs, injuries, team_out, sport="
                     c["roleNote"] = role
                 if hr:
                     c["hitRates"], c["median"] = hr, med
-                    l10, ls = hr.get("last10", [0, 0]), hr.get("lastSeason", [0, 0])
-                    c["why"] = (f"{side.title()} hit {l10[0]}/{l10[1]} last 10, {ls[0]}/{ls[1]} "
-                                f"last season; Pinnacle no-vig {fair * 100:.0f}%.")
-            c.setdefault("why", f"Pinnacle no-vig {fair * 100:.0f}% vs FanDuel {odds:+d}.")
+                    parts = [f"{hr[k][0]}/{hr[k][1]} {label}" for k, label in
+                             (("last10", "last 10"), ("season", "this season"), ("lastSeason", "last season"))
+                             if hr.get(k) and hr[k][1]][:2]
+                    if parts:
+                        c["why"] = (f"{side.title()} hit {', '.join(parts)}; "
+                                    f"Pinnacle no-vig {fair * 100:.0f}%.")
+            c.setdefault("why", f"Pinnacle no-vig {fair * 100:.0f}% vs {book} {odds:+d}.")
             if info:
                 c["injuryNote"] = f"{info['status']}: {info['note']}"
             if team_out.get(fd["team"]):
@@ -433,17 +541,24 @@ def prop_candidates(pin_props, fd_props, tips, logs, injuries, team_out, sport="
     return cands, dropped
 
 
+def best_book(prices):
+    """The book paying the most (FanDuel first on ties)."""
+    return max(prices, key=lambda b: (om.am_to_dec(prices[b]), b == "FanDuel"))
+
+
 def line_candidates(legs):
     market = {"moneyline": "Moneyline", "spread": "Spread", "total over": "Total",
               "total under": "Total", "team total over": "Team total",
               "team total under": "Team total"}
     out = []
     for x in legs:
+        prices = x.get("prices") or {"FanDuel": x["fd"]}
+        book = best_book(prices)
         c = {"sport": x["sport"], "game": x["game"], "start": to_et(x["startISO"]),
              "startISO": to_z(x["startISO"]), "pick": x["pick"], "market": market[x["type"]],
-             "type": x["type"], "prices": {"FanDuel": x["fd"]}, "sharpOdds": x["sharp"],
+             "type": x["type"], "prices": prices, "sharpOdds": x["sharp"],
              "sharpSource": "Pinnacle", "source": SOURCE, "star": False, "adjust": 0.0,
-             "why": f"Pinnacle no-vig {om.fair_prob(x['sharp']) * 100:.0f}% vs FanDuel {x['fd']:+d}."}
+             "why": f"Pinnacle no-vig {om.fair_prob(x['sharp']) * 100:.0f}% vs {book} {prices[book]:+d}."}
         if x.get("team"):
             c["team"] = x["team"]
         out.append(c)
@@ -480,13 +595,22 @@ def espn_logs(sport, players, teams, failures):
     return {n: v for n, v in pool.map(one, players) if v}
 
 
-def fetch(date, sports):
+def fetch(date, sports, books=("FanDuel",)):
     day = date.replace("-", "")
     failures, report, cands = [], {"date": date, "sports": {}}, []
+    ids = {b: PA_BOOKS[b] for b in books if b in PA_BOOKS}
+    report["books"] = sorted(ids)
+    missing = [b for b in books if b not in PA_BOOKS]
+    if missing:
+        report["booksWithoutFeed"] = missing       # e.g. Courtside: no public prices
+    if not ids:
+        report["candidates"], report["failures"] = 0, ["none of the books has a price feed"]
+        return cands, report
+    q = ",".join(ids.values())
     for sport in sports:
         league, an, espn = LEAGUES[sport]
         rep = report["sports"].setdefault(sport, {})
-        board = get(f"{ACTION}/v1/scoreboard/{an}?period=game&date={day}", failures)
+        board = get(f"{ACTION}/v2/scoreboard/{an}?bookIds={q}&date={day}&periods=event", failures)
         matchups = get(f"{PINNACLE}/leagues/{league}/matchups", failures)
         markets = get(f"{PINNACLE}/leagues/{league}/markets/straight", failures)
         if not board or matchups is None or markets is None:
@@ -498,33 +622,73 @@ def fetch(date, sports):
         if not board["games"]:
             continue
         pin = parse_pinnacle(matchups, markets, sport)
-        legs = line_candidates(match_lines(board, pin, sport))
+        legs = line_candidates(match_lines_books(board, pin, sport, ids))
         if not legs:  # Pinnacle sometimes answers with an empty board; ask once more
             time.sleep(5)
             pin = parse_pinnacle(get(f"{PINNACLE}/leagues/{league}/matchups", failures) or [],
                                  get(f"{PINNACLE}/leagues/{league}/markets/straight", failures) or [], sport)
-            legs = line_candidates(match_lines(board, pin, sport))
+            legs = line_candidates(match_lines_books(board, pin, sport, ids))
         cands += legs
         rep["lineLegs"] = len(legs)
         if sport not in PROP_TYPES:
             continue
-        fd = {}
+        boards = {b: {} for b in ids}
         for typ, stat in PROP_TYPES[sport].items():
-            feed = get(f"{ACTION}/v2/scoreboard/{an}/markets?bookIds={FANDUEL_BOOK}"
+            feed = get(f"{ACTION}/v2/scoreboard/{an}/markets?bookIds={q}"
                        f"&date={day}&customPickTypes={typ}", failures)
             if feed and "games" in feed:
-                fd.update(fanduel_props(feed, stat))
+                for b, bid in ids.items():
+                    boards[b].update(book_props(feed, stat, bid))
+        everyone = {k: v for b in boards.values() for k, v in b.items()}
         injuries, team_out = parse_injuries(get(f"{ESPN}/{espn}/injuries", failures))
         logs = {}
         if sport in ESPN_SPORT:
-            logs = espn_logs(sport, {k[0] for k in fd}, {v["team"] for v in fd.values() if v["team"]}, failures)
-        props, dropped = prop_candidates(pinnacle_props(pin), fd, tip_times(board), logs, injuries,
-                                         team_out, sport)
+            logs = espn_logs(sport, {k[0] for k in everyone},
+                             {v["team"] for v in everyone.values() if v["team"]}, failures)
+        props, dropped = prop_candidates(pinnacle_props(pin), boards.get("FanDuel", {}), tip_times(board),
+                                         logs, injuries, team_out, sport,
+                                         others={b: v for b, v in boards.items() if b != "FanDuel"})
         cands += props
         rep.update(propLegs=len(props), playersWithLogs=len(logs), injuryDrops=dropped)
+        rep["pricedAt"] = {b: sum(1 for c in legs + props if b in c["prices"]) for b in ids}
     report["candidates"] = len(cands)
     report["failures"] = failures
     return cands, report
+
+
+def closing_lines(posted, cands, now, within=70):
+    """Closing prices for posted legs whose game starts in the next `within` minutes.
+
+    `posted` legs need pick, game, startISO, odds and book. `clv` compares the
+    book's price now to the price taken; `clvSharp` compares Pinnacle's no-vig
+    chance now to the price taken, the truer test. Both are positive when the
+    pick beat the close."""
+    by_pick = {(c["game"], c["pick"]): c for c in cands}
+    out = []
+    for l in posted:
+        try:
+            start = datetime.fromisoformat(l["startISO"].replace("Z", "+00:00"))
+        except (KeyError, TypeError, ValueError):
+            continue
+        mins = (start - now).total_seconds() / 60
+        if not 0 < mins <= within:
+            continue
+        row = {"pick": l["pick"], "game": l["game"], "book": l.get("book") or "FanDuel",
+               "closeAt": now.strftime("%Y-%m-%dT%H:%M:%SZ"), "minutesBefore": round(mins)}
+        c = by_pick.get((l["game"], l["pick"]))
+        if not c:
+            row["closeNote"] = "line moved or market pulled before the close"
+            out.append(row)
+            continue
+        took = om.implied(l["odds"])
+        close = c["prices"].get(row["book"])
+        if close is not None:
+            row.update(closeOdds=close, clv=round(om.implied(close) - took, 3))
+        fair = om.fair_prob(c["sharpOdds"])
+        row.update(closeSharp=c["sharpOdds"], closeFairProb=round(fair, 3),
+                   clvSharp=round(fair - took, 3), closeSource=f"{row['book']} + Pinnacle at {row['closeAt']}")
+        out.append(row)
+    return out
 
 
 def main(argv=None):
@@ -532,17 +696,34 @@ def main(argv=None):
     ap.add_argument("--date", required=True, help="America/New_York date, YYYY-MM-DD")
     ap.add_argument("--out", required=True, help="folder for candidates.json and fetch_report.json")
     ap.add_argument("--sports", default="NBA,MLB,NFL")
+    ap.add_argument("--books", default="FanDuel", help="Bob's books, comma-separated (settings `books`)")
+    ap.add_argument("--close", help="JSON list of posted legs: write close.json for games starting soon")
+    ap.add_argument("--within", type=int, default=70, help="minutes before the start that count as the close")
     a = ap.parse_args(argv)
-    cands, report = fetch(a.date, [s.strip().upper() for s in a.sports.split(",") if s.strip()])
+    books = [b.strip() for b in a.books.split(",") if b.strip()]
+    sports = [s.strip().upper() for s in a.sports.split(",") if s.strip()]
+    if a.close:
+        with open(a.close) as f:
+            posted = json.load(f)
+        books = sorted(set(books) | {l.get("book") or "FanDuel" for l in posted})
+        sports = sorted({str(l.get("sport", "")).upper() for l in posted} & set(LEAGUES)) or sports
+    cands, report = fetch(a.date, sports, books)
     with open(f"{a.out}/candidates.json", "w") as f:
         json.dump(cands, f, indent=1)
     with open(f"{a.out}/fetch_report.json", "w") as f:
         json.dump(report, f, indent=1)
     for sport, rep in report["sports"].items():
-        print(f"{sport}: " + ", ".join(f"{k} {v if not isinstance(v, list) else len(v)}" for k, v in rep.items()))
+        print(f"{sport}: " + ", ".join(f"{k} {v if not isinstance(v, (list, dict)) else len(v)}" for k, v in rep.items()))
+    if report.get("booksWithoutFeed"):
+        print("no price feed for: " + ", ".join(report["booksWithoutFeed"]))
     print(f"{report['candidates']} candidates, {len(report['failures'])} fetch failures")
+    if a.close:
+        rows = closing_lines(posted, cands, datetime.now(timezone.utc), a.within)
+        with open(f"{a.out}/close.json", "w") as f:
+            json.dump({"at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"), "legs": rows}, f, indent=1)
+        print(f"{len(rows)} closing lines recorded")
+        return 0
     return 0 if cands else 1
-
 
 if __name__ == "__main__":
     sys.exit(main())
