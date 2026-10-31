@@ -443,8 +443,11 @@ def market_snapshot(by_book, sgp, date, book="FanDuel"):
                for l in by_book.get(b, []) if sharp(l)]
         out.sort(key=lambda l: (l["game"], -l["marketEv"]))
         return out
+    def compact(b):   # kept small: the market doc must stay under the 256 KB db limit
+        return [{k: l[k] for k in ("pick", "game", "odds", "fairProb", "marketEv") if k in l}
+                for l in rows(b)]
     return {"date": date, "book": book, "legs": rows(book), "sgp": sgp,
-            "byBook": {b: rows(b) for b in sorted(by_book)}}
+            "byBook": {b: compact(b) for b in sorted(by_book)}}
 
 
 def build_all(candidates, date, settings=None, stats=None, boosts_in=None):

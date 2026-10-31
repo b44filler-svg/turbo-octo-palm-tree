@@ -718,4 +718,5 @@ def test_market_snapshot_lists_every_book():
     res = build.build_all(legs, "2030-01-01", {"neverAgainst": EAGLES, "books": ["FanDuel", "DraftKings"]})
     by = res["market"]["byBook"]
     assert by["FanDuel"][0]["odds"] == 120 and by["DraftKings"][0]["odds"] == 125
-    assert res["market"]["legs"] == by["FanDuel"]
+    assert set(by["FanDuel"][0]) == {"pick", "game", "odds", "fairProb", "marketEv"}   # compact rows
+    assert res["market"]["legs"][0]["pick"] == by["FanDuel"][0]["pick"]
