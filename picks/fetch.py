@@ -479,7 +479,8 @@ def is_star(stat, line):
             or (stat in ("Rushing Yards", "Receiving Yards") and line >= 69.5))
 
 
-def prop_candidates(pin_props, fd_props, tips, logs, injuries, team_out, sport="NBA", others=None):
+def prop_candidates(pin_props, fd_props, tips, logs, injuries, team_out, sport="NBA", others=None,
+                    min_ev=MIN_PROP_EV, odds_range=(-500, 200)):
     """Prop legs where Pinnacle prices the same line. `fd_props` is FanDuel's board;
     `others` is {book: board} for Bob's other books. A leg's `prices` lists every
     book posting both sides of that exact line."""
@@ -505,13 +506,13 @@ def prop_candidates(pin_props, fd_props, tips, logs, injuries, team_out, sport="
         if not iso:
             continue
         for side, sharp in (("over", [p_over, p_under]), ("under", [p_under, p_over])):
-            prices = {book: x[side] for book, x in at.items() if -500 <= x[side] <= 200}
+            prices = {book: x[side] for book, x in at.items() if odds_range[0] <= x[side] <= odds_range[1]}
             if not prices:
                 continue
             book = best_book(prices)
             odds = prices[book]
             fair = om.fair_prob(sharp)
-            if om.ev(fair, odds) < MIN_PROP_EV:
+            if om.ev(fair, odds) < min_ev:
                 continue
             c = {"sport": sport, "game": game,
                  "start": to_et(iso), "startISO": to_z(iso),
@@ -595,7 +596,8 @@ def espn_logs(sport, players, teams, failures):
     return {n: v for n, v in pool.map(one, players) if v}
 
 
-def fetch(date, sports, books=("FanDuel",)):
+def fetch(date, sports, books=("FanDuel",), everything=False):
+    """`everything` keeps props at any price (closing lines need the bad ones too)."""
     day = date.replace("-", "")
     failures, report, cands = [], {"date": date, "sports": {}}, []
     ids = {b: PA_BOOKS[b] for b in books if b in PA_BOOKS}
@@ -647,7 +649,8 @@ def fetch(date, sports, books=("FanDuel",)):
                              {v["team"] for v in everyone.values() if v["team"]}, failures)
         props, dropped = prop_candidates(pinnacle_props(pin), boards.get("FanDuel", {}), tip_times(board),
                                          logs, injuries, team_out, sport,
-                                         others={b: v for b, v in boards.items() if b != "FanDuel"})
+                                         others={b: v for b, v in boards.items() if b != "FanDuel"},
+                                         **({"min_ev": -1.0, "odds_range": (-100000, 100000)} if everything else {}))
         cands += props
         rep.update(propLegs=len(props), playersWithLogs=len(logs), injuryDrops=dropped)
         rep["pricedAt"] = {b: sum(1 for c in legs + props if b in c["prices"]) for b in ids}
@@ -707,7 +710,7 @@ def main(argv=None):
             posted = json.load(f)
         books = sorted(set(books) | {l.get("book") or "FanDuel" for l in posted})
         sports = sorted({str(l.get("sport", "")).upper() for l in posted} & set(LEAGUES)) or sports
-    cands, report = fetch(a.date, sports, books)
+    cands, report = fetch(a.date, sports, books, everything=bool(a.close))
     with open(f"{a.out}/candidates.json", "w") as f:
         json.dump(cands, f, indent=1)
     with open(f"{a.out}/fetch_report.json", "w") as f:

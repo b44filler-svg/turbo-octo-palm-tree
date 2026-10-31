@@ -239,3 +239,13 @@ def test_closing_lines_for_games_about_to_start():
 
 def test_pa_boards_include_draftkings():
     assert fetch.PA_BOOKS["FanDuel"] == "255" and fetch.PA_BOOKS["DraftKings"] == "1534"
+
+
+def test_closing_mode_keeps_props_whose_price_went_bad():
+    rows = fetch.parse_pinnacle(MATCHUPS, MARKETS, "NBA")
+    pin, tips = fetch.pinnacle_props(rows), fetch.tip_times(SCOREBOARD)
+    fd = fetch.fanduel_props(PROP_FEED, "Rebounds")
+    normal, _ = fetch.prop_candidates(pin, fd, tips, {}, {}, {})
+    full, _ = fetch.prop_candidates(pin, fd, tips, {}, {}, {}, min_ev=-1.0, odds_range=(-100000, 100000))
+    assert "Jalen Johnson Under 9.5 Rebounds" not in [c["pick"] for c in normal]   # +104 vs Pinnacle +108
+    assert "Jalen Johnson Under 9.5 Rebounds" in [c["pick"] for c in full]
