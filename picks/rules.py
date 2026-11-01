@@ -73,15 +73,21 @@ def game_key(game):
     return " @ ".join(nickname(t) for t in teams)
 
 
+# Stats a team wants LESS of: an over on a quarterback's interceptions thrown
+# pulls against his team, an under pulls for it.
+BAD_STAT = re.compile(r"\binterceptions?\b|\bfumbles?\b|\bsacks? taken\b", re.I)
+
+
 def direction(leg):
     """('for' | 'against' | 'neutral' | 'unknown', team) — which team the leg needs to do well or badly."""
     t = str(leg.get("type", "")).lower()
     if t in NEUTRAL:
         return "neutral", None
+    flip = t.startswith("prop") and BAD_STAT.search(f"{leg.get('market', '')} {leg.get('pick', '')}")
     if t in FOR_TYPES:
-        return "for", leg.get("team")
+        return ("against" if flip else "for"), leg.get("team")
     if t in AGAINST_TYPES:
-        return "against", leg.get("team")
+        return ("for" if flip else "against"), leg.get("team")
     return "unknown", leg.get("team")
 
 

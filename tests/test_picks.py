@@ -720,3 +720,17 @@ def test_market_snapshot_lists_every_book():
     assert by["FanDuel"][0]["odds"] == 120 and by["DraftKings"][0]["odds"] == 125
     assert set(by["FanDuel"][0]) == {"pick", "game", "odds", "fairProb", "marketEv"}   # compact rows
     assert res["market"]["legs"][0]["pick"] == by["FanDuel"][0]["pick"]
+
+
+def test_interception_overs_bet_against_the_qbs_team():
+    g = {"sport": "NFL", "game": "Philadelphia Eagles @ Washington Commanders", "market": "Interceptions"}
+    mckee_over = {**g, "type": "prop over", "team": "Philadelphia Eagles", "player": "Tanner McKee",
+                  "pick": "Tanner McKee Over 0.5 Interceptions"}
+    mckee_under = {**mckee_over, "type": "prop under", "pick": "Tanner McKee Under 0.5 Interceptions"}
+    daniels_over = {**g, "type": "prop over", "team": "Washington Commanders", "player": "Jayden Daniels",
+                    "pick": "Jayden Daniels Over 0.5 Interceptions"}
+    daniels_under = {**daniels_over, "type": "prop under", "pick": "Jayden Daniels Under 0.5 Interceptions"}
+    assert rules.loyalty_violation(mckee_over, EAGLES)          # Eagles QB throwing picks: against
+    assert rules.loyalty_violation(daniels_under, EAGLES)       # opponent QB safe with the ball: against
+    assert not rules.loyalty_violation(mckee_under, EAGLES)
+    assert not rules.loyalty_violation(daniels_over, EAGLES)
