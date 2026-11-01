@@ -717,9 +717,20 @@ def test_market_snapshot_lists_every_book():
              "prices": {"FanDuel": 120, "DraftKings": 125}, "sharpOdds": [110, -130], "source": "x"}]
     res = build.build_all(legs, "2030-01-01", {"neverAgainst": EAGLES, "books": ["FanDuel", "DraftKings"]})
     by = res["market"]["byBook"]
-    assert by["FanDuel"][0]["odds"] == 120 and by["DraftKings"][0]["odds"] == 125
-    assert set(by["FanDuel"][0]) == {"pick", "game", "odds", "fairProb", "marketEv"}   # compact rows
-    assert res["market"]["legs"][0]["pick"] == by["FanDuel"][0]["pick"]
+    assert "FanDuel" not in by and by["DraftKings"][0]["odds"] == 125     # FanDuel lives in `legs`
+    assert set(by["DraftKings"][0]) == {"pick", "game", "odds", "fairProb", "marketEv"}   # compact rows
+    assert res["market"]["legs"][0]["odds"] == 120
+
+
+def test_market_snapshot_fits_the_database():
+    import json as _json
+    legs = [{"sport": "NBA", "game": f"A{i} @ B{i}", "pick": f"Player {i} Over 10.5 Points", "type": "prop over",
+             "market": "Points", "team": f"A{i}", "player": f"Player {i}", "start": "7:00 PM ET",
+             "startISO": "2030-01-01T00:00:00Z", "prices": {"FanDuel": -150, "DraftKings": -150},
+             "sharpOdds": [-110, -110], "source": "x"} for i in range(1500)]
+    res = build.build_all(legs, "2030-01-01", {"neverAgainst": EAGLES, "books": ["FanDuel", "DraftKings"]})
+    assert len(_json.dumps(res["market"]).encode()) <= build.MARKET_MAX_BYTES
+    assert res["market"].get("trimmed")
 
 
 def test_interception_overs_bet_against_the_qbs_team():

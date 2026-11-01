@@ -434,20 +434,33 @@ MARKET_FIELDS = ("sport", "game", "start", "startISO", "pick", "market", "type",
                  "odds", "book", "fairProb", "marketEv", "modelProb")
 
 
+MARKET_MAX_BYTES = 230_000   # the app's db caps a document at 256 KB
+FAR_UNDER = -0.05            # legs this far under the sharp price never post
+
+
 def market_snapshot(by_book, sgp, date, book="FanDuel"):
     """Every sharp-priced leg at the book, for the app's parlay checker (doc market/<date>).
-    `byBook` holds the same for each of Bob's books, so a price scan can check a
-    board bet at the book it names."""
+
+    `byBook` holds compact rows for Bob's other books (within 5% of the sharp
+    price), so a price scan can check a board bet at the book it names; `legs`
+    already covers `book`. On a big slate the far-under legs are trimmed so the
+    document fits the database (`trimmed` says so)."""
     def rows(b):
         out = [{k: l.get(k) for k in MARKET_FIELDS if l.get(k) is not None}
                for l in by_book.get(b, []) if sharp(l)]
         out.sort(key=lambda l: (l["game"], -l["marketEv"]))
         return out
-    def compact(b):   # kept small: the market doc must stay under the 256 KB db limit
+
+    def compact(b):
         return [{k: l[k] for k in ("pick", "game", "odds", "fairProb", "marketEv") if k in l}
-                for l in rows(b)]
-    return {"date": date, "book": book, "legs": rows(book), "sgp": sgp,
-            "byBook": {b: compact(b) for b in sorted(by_book)}}
+                for l in rows(b) if l["marketEv"] >= FAR_UNDER]
+
+    snap = {"date": date, "book": book, "legs": rows(book), "sgp": sgp,
+            "byBook": {b: compact(b) for b in sorted(by_book) if b != book}}
+    if len(json.dumps(snap).encode()) > MARKET_MAX_BYTES:
+        snap["legs"] = [l for l in snap["legs"] if l["marketEv"] >= FAR_UNDER]
+        snap["trimmed"] = True
+    return snap
 
 
 def build_all(candidates, date, settings=None, stats=None, boosts_in=None):
