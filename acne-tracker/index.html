@@ -1,0 +1,764 @@
+<title>Clearday Skin Journal</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Figtree:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: one-column phone app, three views (Scan / Progress / History) behind a bottom tab bar. */
+:root {
+  --bg: #f3f6f5;
+  --surface: #ffffff;
+  --sunk: #e6eeec;
+  --line: #d3dedb;
+  --ink: #13262b;
+  --muted: #5b6e72;
+  --accent: #0f8a7e;
+  --accent-ink: #ffffff;
+  --accent-soft: #d6efeb;
+  --flare: #d9534f;
+  --flare-soft: #fbe3e1;
+  --warn: #b7791f;
+  --z0: #e3ece9; --z1: #f6d9c8; --z2: #ec9f86; --z3: #cf5a48;
+  --font-display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  --font-body: "Figtree", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --r: 14px;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0d1719; --surface: #152226; --sunk: #1c2c30; --line: #2a3d42; --ink: #e4efed; --muted: #94aaad;
+  --accent: #3cc2b2; --accent-ink: #062521; --accent-soft: #163c39; --flare: #f07a72; --flare-soft: #3d2120; --warn: #e0a84a;
+  --z0: #22353a; --z1: #5a3f35; --z2: #9a5443; --z3: #e0685a; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #0d1719; --surface: #152226; --sunk: #1c2c30; --line: #2a3d42; --ink: #e4efed; --muted: #94aaad;
+  --accent: #3cc2b2; --accent-ink: #062521; --accent-soft: #163c39; --flare: #f07a72; --flare-soft: #3d2120; --warn: #e0a84a;
+  --z0: #22353a; --z1: #5a3f35; --z2: #9a5443; --z3: #e0685a; color-scheme: dark }
+
+* { box-sizing: border-box }
+[hidden] { display: none !important }
+html, body { background: var(--bg) }
+body { color: var(--ink); font: 15px/1.5 var(--font-body); }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg) }
+.wrap { max-width: 560px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 18px calc(96px + env(safe-area-inset-bottom, 0px)); display: grid; gap: 18px }
+h1, h2, h3 { font-family: var(--font-display); text-wrap: balance; margin: 0; line-height: 1.15 }
+h1 { font-size: 1.75rem; font-weight: 700; letter-spacing: -0.01em }
+h2 { font-size: 1.2rem; font-weight: 700 }
+h3 { font-size: 1rem; font-weight: 500 }
+p { margin: 0 }
+.muted { color: var(--muted) }
+.small { font-size: .85rem }
+.label { font-size: .72rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 600 }
+.num { font-family: var(--font-mono); font-variant-numeric: tabular-nums }
+header.top { display: flex; align-items: center; justify-content: space-between; gap: 12px }
+.brand { display: flex; align-items: center; gap: 10px }
+.brand svg { flex: none }
+.status { font-size: .78rem; color: var(--muted); text-align: right }
+
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 16px; display: grid; gap: 14px; min-width: 0 }
+.stack { display: grid; gap: 10px }
+.row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center }
+
+button, .btn { font: 600 .95rem var(--font-body); border-radius: 999px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); padding: 10px 16px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px }
+button.primary, .btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent) }
+button.ghost { background: transparent }
+button.danger { color: var(--flare); border-color: var(--flare) }
+button:disabled { opacity: .5; cursor: default }
+button:focus-visible, .btn:focus-within, input:focus-visible, textarea:focus-visible, select:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px }
+.btn input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none }
+.btn { position: relative }
+.grow { flex: 1 1 140px }
+
+/* camera frame */
+.frame { position: relative; aspect-ratio: 4 / 5; max-width: 100%; border-radius: 18px; overflow: hidden; background: var(--sunk); display: grid; place-items: center }
+.frame canvas, .frame img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover }
+.frame .guide { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none }
+.frame .empty { position: relative; text-align: center; padding: 24px; display: grid; gap: 6px; justify-items: center; max-width: 30ch }
+.tips { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 14px; padding: 0; margin: 0; list-style: none; font-size: .85rem; color: var(--muted) }
+.tips li { display: flex; gap: 6px }
+.tips li::before { content: "✓"; color: var(--accent); font-weight: 700 }
+
+/* results */
+.grade { display: flex; align-items: center; gap: 14px }
+.dial { width: 74px; height: 74px; flex: none }
+.pill { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 999px; font-size: .78rem; font-weight: 600; background: var(--sunk); color: var(--ink) }
+.pill.good { background: var(--accent-soft); color: var(--accent) }
+.pill.bad { background: var(--flare-soft); color: var(--flare) }
+.pill.warn { background: var(--flare-soft); color: var(--warn) }
+.counts { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px }
+.counts div { background: var(--sunk); border-radius: 10px; padding: 8px 4px; text-align: center; display: grid; gap: 2px }
+.counts b { font: 600 1.15rem var(--font-mono) }
+.counts span { font-size: .68rem; color: var(--muted); line-height: 1.2 }
+.split { display: grid; grid-template-columns: 140px minmax(0, 1fr); gap: 14px; align-items: center }
+@media (max-width: 380px) { .split { grid-template-columns: 1fr } .counts { grid-template-columns: repeat(3, minmax(0, 1fr)) } }
+ul.plain { margin: 0; padding-left: 18px; display: grid; gap: 4px }
+.notice { border-radius: 10px; padding: 10px 12px; font-size: .88rem; background: var(--flare-soft); color: var(--ink) }
+.notice.info { background: var(--accent-soft) }
+
+/* factors */
+.chips { display: flex; flex-wrap: wrap; gap: 8px }
+.chip { font: 500 .85rem var(--font-body); border-radius: 999px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); padding: 6px 12px; min-height: 36px }
+.chip[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); color: var(--accent) }
+input[type=text], textarea { width: 100%; font: 400 .95rem var(--font-body); color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px }
+textarea { min-height: 64px; resize: vertical }
+
+/* progress */
+.stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px }
+.stat { display: grid; gap: 2px; min-width: 0 }
+.stat b { font: 600 1.4rem var(--font-mono); font-variant-numeric: tabular-nums }
+.seg { display: inline-flex; background: var(--sunk); border-radius: 999px; padding: 3px; gap: 2px }
+.seg button { min-height: 32px; padding: 4px 12px; border: 0; background: transparent; font-size: .82rem }
+.seg button[aria-pressed="true"] { background: var(--surface); box-shadow: 0 1px 2px rgba(0,0,0,.12) }
+.chart { width: 100%; height: auto; display: block }
+.chart text { fill: var(--muted); font: 10px var(--font-mono) }
+.insight { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: center; padding-block: 8px; border-top: 1px solid var(--line) }
+.insight:first-child { border-top: 0 }
+.compare { position: relative; aspect-ratio: 4 / 5; max-width: 100%; border-radius: 14px; overflow: hidden; background: var(--sunk); touch-action: pan-y }
+.compare img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover }
+.compare .after { clip-path: inset(0 0 0 var(--cut, 50%)) }
+.compare .handle { position: absolute; top: 0; bottom: 0; left: var(--cut, 50%); width: 2px; background: #fff; box-shadow: 0 0 0 1px rgba(0,0,0,.25) }
+.compare .tag { position: absolute; top: 10px; padding: 2px 8px; border-radius: 999px; font: 600 .72rem var(--font-body); background: rgba(0,0,0,.55); color: #fff }
+input[type=range] { width: 100%; accent-color: var(--accent) }
+select { font: 500 .88rem var(--font-body); color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; min-height: 40px; width: 100%; min-width: 0 }
+.pickers { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px }
+
+/* history */
+.hist { display: grid; gap: 10px }
+.hitem { display: grid; grid-template-columns: 64px minmax(0, 1fr) auto; gap: 12px; align-items: center; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 10px }
+.hitem img { width: 64px; height: 80px; object-fit: cover; border-radius: 10px; background: var(--sunk) }
+.hitem .meta { display: grid; gap: 4px; min-width: 0 }
+.hitem .meta p { overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
+.hitem .acts { display: grid; gap: 6px; justify-items: end }
+.hitem .acts button { min-height: 34px; padding: 4px 12px; font-size: .8rem }
+
+/* tab bar */
+nav.tabs { position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; background: var(--surface); border-top: 1px solid var(--line); padding-bottom: env(safe-area-inset-bottom, 0px); padding-left: max(8px, env(safe-area-inset-left, 0px)); padding-right: max(8px, env(safe-area-inset-right, 0px)) }
+nav.tabs .in { max-width: 560px; margin: 0 auto; display: grid; grid-template-columns: repeat(3, 1fr) }
+nav.tabs a { display: grid; justify-items: center; gap: 2px; padding: 8px 4px 10px; color: var(--muted); text-decoration: none; font-size: .75rem; font-weight: 600 }
+nav.tabs a[aria-current="page"] { color: var(--accent) }
+nav.tabs a:focus-visible { outline: 3px solid var(--accent); outline-offset: -3px; border-radius: 8px }
+nav.tabs svg { width: 24px; height: 24px }
+
+.spinner { width: 18px; height: 18px; border-radius: 50%; border: 2px solid currentColor; border-right-color: transparent; animation: spin .8s linear infinite }
+@keyframes spin { to { transform: rotate(360deg) } }
+@media (prefers-reduced-motion: reduce) { .spinner { animation-duration: 3s } }
+.toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(84px + env(safe-area-inset-bottom, 0px)); background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 999px; font-weight: 600; font-size: .9rem; z-index: 30; max-width: calc(100% - 32px) }
+.disclaimer { font-size: .78rem; color: var(--muted); text-align: center; max-width: 52ch; justify-self: center }
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <svg width="34" height="34" viewBox="0 0 34 34" aria-hidden="true"><ellipse cx="17" cy="17" rx="12" ry="15" fill="none" stroke="var(--accent)" stroke-width="2.5"/><circle cx="12.5" cy="15" r="1.8" fill="var(--flare)"/><circle cx="21" cy="21" r="1.3" fill="var(--flare)" opacity=".6"/></svg>
+      <div><h1>Clearday</h1><p class="small muted">Your acne progress, one scan a day</p></div>
+    </div>
+    <p class="status" id="storeStatus">Loading…</p>
+  </header>
+
+  <!-- SCAN VIEW -->
+  <section id="view-scan" class="stack" style="gap:18px">
+    <div class="card">
+      <div class="row" style="justify-content:space-between">
+        <h2 id="scanTitle">Today's scan</h2>
+        <span class="pill" id="todayPill" hidden></span>
+      </div>
+      <div class="frame" id="frame">
+        <canvas id="photoCanvas" hidden></canvas>
+        <canvas id="markCanvas" hidden></canvas>
+        <svg class="guide" viewBox="0 0 400 500" preserveAspectRatio="none" aria-hidden="true">
+          <ellipse cx="200" cy="235" rx="144" ry="210" fill="none" stroke="var(--accent)" stroke-width="3" stroke-dasharray="10 8" opacity=".85"/>
+        </svg>
+        <div class="empty" id="frameEmpty">
+          <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.8" aria-hidden="true"><path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2"/><circle cx="12" cy="12" r="3.5"/></svg>
+          <h3>Line your face up in the oval</h3>
+          <p class="small muted">Take a front-facing selfie. Use the same spot and light each day so scans compare fairly.</p>
+        </div>
+      </div>
+      <div class="row">
+        <label class="btn primary grow" for="camInput">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>
+          <span id="camLabel">Take selfie</span>
+          <input id="camInput" type="file" accept="image/*" capture="user">
+        </label>
+        <label class="btn grow" for="fileInput">Upload photo<input id="fileInput" type="file" accept="image/*"></label>
+      </div>
+      <ul class="tips">
+        <li>Daylight, facing a window</li>
+        <li>No makeup or filters</li>
+        <li>Hair pulled back</li>
+        <li>Same distance each time</li>
+      </ul>
+    </div>
+
+    <div class="card" id="resultCard" hidden>
+      <div class="row" style="justify-content:space-between">
+        <h2>Scan results</h2>
+        <button class="primary" id="analyzeBtn">Analyze with Claude</button>
+      </div>
+      <div id="localResult" class="stack"></div>
+      <div id="aiResult" class="stack"></div>
+      <p class="small muted" id="aiNote"></p>
+    </div>
+
+    <div class="card" id="logCard" hidden>
+      <h2>What happened today?</h2>
+      <p class="small muted">Tag anything that might matter. Clearday compares your skin on days with and without each tag.</p>
+      <div class="chips" id="factorChips"></div>
+      <label class="stack" for="products"><span class="label">Products used</span>
+        <input id="products" type="text" placeholder="e.g. benzoyl peroxide 2.5%, moisturizer">
+      </label>
+      <label class="stack" for="note"><span class="label">Note</span>
+        <textarea id="note" placeholder="Anything else: new spot on chin, skin felt dry…"></textarea>
+      </label>
+      <div class="row">
+        <button class="primary grow" id="saveBtn">Save scan</button>
+        <button class="ghost" id="discardBtn">Discard</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- PROGRESS VIEW -->
+  <section id="view-progress" class="stack" style="gap:18px" hidden>
+    <div class="card">
+      <div class="row" style="justify-content:space-between"><h2>Progress</h2><span class="pill" id="trendPill"></span></div>
+      <div class="stats">
+        <div class="stat"><span class="label">Latest</span><b id="stLatest">–</b><span class="small muted" id="stLatestSub">severity / 10</span></div>
+        <div class="stat"><span class="label">Since first</span><b id="stChange">–</b><span class="small muted" id="stChangeSub">change</span></div>
+        <div class="stat"><span class="label">Streak</span><b id="stStreak">0</b><span class="small muted">days in a row</span></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="row" style="justify-content:space-between">
+        <h3>Over time</h3>
+        <div class="seg" role="group" aria-label="Chart metric" id="metricSeg">
+          <button aria-pressed="true" data-m="severity">Severity</button>
+          <button aria-pressed="false" data-m="lesions">Breakouts</button>
+          <button aria-pressed="false" data-m="red">Redness</button>
+        </div>
+      </div>
+      <div id="chartBox"></div>
+      <p class="small muted" id="chartNote"></p>
+    </div>
+    <div class="card">
+      <h3>Where breakouts show up</h3>
+      <div class="split">
+        <div id="faceMap"></div>
+        <div class="stack small" id="zoneList"></div>
+      </div>
+    </div>
+    <div class="card">
+      <h3>Before &amp; after</h3>
+      <div class="pickers">
+        <label class="stack" for="cmpA"><span class="label">Before</span><select id="cmpA"></select></label>
+        <label class="stack" for="cmpB"><span class="label">After</span><select id="cmpB"></select></label>
+      </div>
+      <div class="compare" id="compare">
+        <img id="cmpImgA" alt="Before photo">
+        <img id="cmpImgB" class="after" alt="After photo">
+        <div class="handle"></div>
+        <span class="tag" style="left:10px">Before</span><span class="tag" style="right:10px">After</span>
+      </div>
+      <label for="cmpCut" class="small muted">Drag to compare</label>
+      <input id="cmpCut" type="range" min="0" max="100" value="50">
+    </div>
+    <div class="card">
+      <h3>Triggers to watch</h3>
+      <div id="insights"></div>
+    </div>
+  </section>
+
+  <!-- HISTORY VIEW -->
+  <section id="view-history" class="stack" hidden>
+    <div class="row" style="justify-content:space-between"><h2>All scans</h2><span class="small muted" id="histCount"></span></div>
+    <div class="hist" id="histList"></div>
+  </section>
+
+  <p class="disclaimer">Clearday gives cosmetic estimates, not a diagnosis. For painful nodules or cysts, scarring, or acne that isn't improving after 8–12 weeks of treatment, see a dermatologist.</p>
+</div>
+
+<nav class="tabs" aria-label="Sections"><div class="in">
+  <a href="#scan" data-v="scan"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2"/><circle cx="12" cy="12" r="3.5"/></svg>Scan</a>
+  <a href="#progress" data-v="progress"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 19h16M5 15l4-5 4 3 6-7"/></svg>Progress</a>
+  <a href="#history" data-v="history"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/></svg>History</a>
+</div></nav>
+
+<script>
+(() => {
+"use strict";
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+const FACTORS = [
+  ["sleep", "Slept 7h+"], ["water", "Lots of water"], ["stress", "Stressed"], ["period", "Period"],
+  ["dairy", "Dairy"], ["sugar", "Sugary food"], ["workout", "Workout"], ["picked", "Picked skin"],
+  ["newproduct", "New product"], ["makeup", "Wore makeup"], ["sun", "Sun exposure"], ["meds", "Took acne meds"],
+];
+const LESIONS = [["whiteheads", "White-heads"], ["blackheads", "Black-heads"], ["papules", "Red bumps"], ["pustules", "Pus spots"], ["nodules", "Deep / cysts"]];
+const ZONES = [["forehead", "Forehead"], ["nose", "Nose"], ["leftCheek", "Left cheek"], ["rightCheek", "Right cheek"], ["chin", "Chin"], ["jaw", "Jawline"]];
+const GRADES = ["Clear", "Almost clear", "Mild", "Moderate", "Severe"]; // IGA 0–4
+
+/* ---------------- storage ---------------- */
+let scans = [];           // newest first
+let store = null;         // {kind, save(scan), remove(id)}
+const LS_KEY = "clearday.scans.v1";
+
+function lsLoad() { try { return JSON.parse(localStorage.getItem(LS_KEY) || "[]"); } catch { return []; } }
+function lsSave(list) { try { localStorage.setItem(LS_KEY, JSON.stringify(list)); return true; } catch { return false; } }
+function setScans(list) { scans = list.slice().sort((a, b) => (b.at > a.at ? 1 : -1)); renderAll(); }
+
+function useLocal(reason) {
+  store = {
+    kind: "local",
+    async save(s) { const l = lsLoad().filter((x) => x.id !== s.id); l.push(s); if (!lsSave(l)) throw new Error("This device's storage is full. Delete old scans and try again."); setScans(l); },
+    async remove(id) { const l = lsLoad().filter((x) => x.id !== id); lsSave(l); setScans(l); },
+  };
+  $("storeStatus").textContent = reason || "Saved on this device";
+  setScans(lsLoad());
+}
+
+async function initStore() {
+  const use = window.claude && window.claude.use;
+  if (!use) return useLocal("Saved on this device");
+  try {
+    const [db, user] = await Promise.all([window.claude.use("db"), window.claude.use("user")]);
+    const uid = user ? await user.id() : null;
+    if (!db || !uid) return useLocal("Saved on this device");
+    const col = db.collection("data/users/" + uid);
+    $("storeStatus").textContent = "Syncing…";
+    const timer = setTimeout(() => { $("storeStatus").textContent = "Can't reach your saved scans yet"; }, 10000);
+    col.onSnapshot((snap) => {
+      if (!snap.metadata.fromCache) { clearTimeout(timer); $("storeStatus").textContent = "Private · synced"; }
+      setScans(snap.docs.filter((d) => d.exists).map((d) => ({ ...d.data(), id: d.id })));
+    }, (err) => { clearTimeout(timer); $("storeStatus").textContent = "Sync stopped: " + (err && err.message || "error"); });
+    store = {
+      kind: "db",
+      async save(s) { const { id, ...body } = s; await col.doc(id).set(body); },
+      async remove(id) { await col.doc(id).delete(); },
+    };
+  } catch (e) { useLocal("Saved on this device"); }
+}
+
+/* ---------------- sample (Claude vision) ---------------- */
+let samplePromise = null;
+function getSample() {
+  if (!samplePromise) samplePromise = (async () => {
+    if (!(window.claude && window.claude.use)) return null;
+    const s = await window.claude.use("sample");
+    if (!s) return null;
+    const lim = await s.limits().catch(() => null);
+    return lim && lim.images ? s : null;
+  })().catch(() => null);
+  return samplePromise;
+}
+
+/* ---------------- image handling ---------------- */
+let current = null; // {blob, thumb, local, ai, w, h}
+
+async function loadImage(file) {
+  const url = URL.createObjectURL(file);
+  try {
+    const img = new Image();
+    img.decoding = "async";
+    img.src = url;
+    await img.decode();
+    return img;
+  } finally { setTimeout(() => URL.revokeObjectURL(url), 2000); }
+}
+
+// crop to 4:5 portrait, centered, then scale so the longest side is `max`
+function cropCanvas(img, max) {
+  const iw = img.naturalWidth, ih = img.naturalHeight, ratio = 4 / 5;
+  let sw = iw, sh = iw / ratio;
+  if (sh > ih) { sh = ih; sw = ih * ratio; }
+  const sx = (iw - sw) / 2, sy = (ih - sh) / 2;
+  const h = Math.min(max, Math.round(sh)), w = Math.round(h * ratio);
+  const c = document.createElement("canvas"); c.width = w; c.height = h;
+  c.getContext("2d").drawImage(img, sx, sy, sw, sh, 0, 0, w, h);
+  return c;
+}
+const toBlob = (c, q) => new Promise((r) => c.toBlob(r, "image/jpeg", q));
+const toDataURL = (c, q) => c.toDataURL("image/jpeg", q);
+
+/* Local skin measurement: Lab a* (red–green) inside the face oval.
+   Spots = small patches noticeably redder than the skin around them. */
+function analyzeLocal(srcCanvas) {
+  const W = 200, H = 250;
+  const c = document.createElement("canvas"); c.width = W; c.height = H;
+  const ctx = c.getContext("2d", { willReadFrequently: true });
+  ctx.drawImage(srcCanvas, 0, 0, W, H);
+  const px = ctx.getImageData(0, 0, W, H).data;
+  const A = new Float32Array(W * H), L = new Float32Array(W * H), mask = new Uint8Array(W * H);
+  const cx = W / 2, cy = H * 0.47, rx = W * 0.33, ry = H * 0.40;
+  const lin = (v) => { v /= 255; return v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); };
+  const f = (t) => (t > 0.008856 ? Math.cbrt(t) : 7.787 * t + 16 / 116);
+  const skinA = [];
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const i = y * W + x, p = i * 4;
+    const r = lin(px[p]), g = lin(px[p + 1]), b = lin(px[p + 2]);
+    const X = (r * 0.4124 + g * 0.3576 + b * 0.1805) / 0.95047, Y = r * 0.2126 + g * 0.7152 + b * 0.0722, Z = (r * 0.0193 + g * 0.1192 + b * 0.9505) / 1.08883;
+    const fy = f(Y);
+    L[i] = 116 * fy - 16; A[i] = 500 * (f(X) - fy);
+    const inOval = ((x - cx) / rx) ** 2 + ((y - cy) / ry) ** 2 <= 1;
+    // skip eyes/brows band roughly and non-skin tones
+    const eyeBand = y > H * 0.30 && y < H * 0.42 && Math.abs(x - cx) > W * 0.05;
+    const mouth = y > H * 0.66 && y < H * 0.75 && Math.abs(x - cx) < W * 0.13;
+    if (inOval && !eyeBand && !mouth && L[i] > 22 && L[i] < 96 && A[i] > -2) { mask[i] = 1; skinA.push(A[i]); }
+  }
+  if (skinA.length < 500) return { ok: false };
+  skinA.sort((a, b) => a - b);
+  const med = skinA[skinA.length >> 1];
+  const mad = skinA.map((v) => Math.abs(v - med)).sort((a, b) => a - b)[skinA.length >> 1] || 1;
+  const thrRed = med + Math.max(6, 2.5 * mad);
+  let redPx = 0; for (const v of skinA) if (v > thrRed) redPx++;
+  const redPct = (100 * redPx) / skinA.length;
+
+  // local contrast in a*: subtract box blur (radius 7) using integral image
+  const R = 7, S = new Float64Array((W + 1) * (H + 1)), M = new Float64Array((W + 1) * (H + 1));
+  for (let y = 0; y < H; y++) { let rs = 0, rm = 0; for (let x = 0; x < W; x++) { const i = y * W + x; rs += mask[i] ? A[i] : 0; rm += mask[i]; S[(y + 1) * (W + 1) + x + 1] = S[y * (W + 1) + x + 1] + rs; M[(y + 1) * (W + 1) + x + 1] = M[y * (W + 1) + x + 1] + rm; } }
+  const box = (T, x0, y0, x1, y1) => T[y1 * (W + 1) + x1] - T[y0 * (W + 1) + x1] - T[y1 * (W + 1) + x0] + T[y0 * (W + 1) + x0];
+  const hot = new Uint8Array(W * H);
+  const dThr = Math.max(4.5, 2 * mad);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const i = y * W + x; if (!mask[i]) continue;
+    const x0 = Math.max(0, x - R), y0 = Math.max(0, y - R), x1 = Math.min(W, x + R + 1), y1 = Math.min(H, y + R + 1);
+    const n = box(M, x0, y0, x1, y1); if (n < 20) continue;
+    if (A[i] - box(S, x0, y0, x1, y1) / n > dThr) hot[i] = 1;
+  }
+  // connected components
+  const seen = new Uint8Array(W * H), spots = [];
+  for (let i = 0; i < W * H; i++) {
+    if (!hot[i] || seen[i]) continue;
+    const q = [i]; seen[i] = 1; let n = 0, sx = 0, sy = 0;
+    while (q.length) { const j = q.pop(); n++; const x = j % W, y = (j / W) | 0; sx += x; sy += y;
+      for (const k of [j - 1, j + 1, j - W, j + W]) if (k >= 0 && k < W * H && hot[k] && !seen[k] && Math.abs((k % W) - x) <= 1) { seen[k] = 1; q.push(k); } }
+    if (n >= 3 && n <= 90) spots.push({ x: sx / n / W, y: sy / n / H, r: Math.sqrt(n / Math.PI) / W });
+  }
+  return { ok: true, spots: spots.slice(0, 80), spotCount: Math.min(spots.length, 80), redPct: Math.round(redPct * 10) / 10 };
+}
+
+function drawMarks(local, showing) {
+  const mc = $("markCanvas"), pc = $("photoCanvas");
+  mc.width = pc.width; mc.height = pc.height;
+  const ctx = mc.getContext("2d"); ctx.clearRect(0, 0, mc.width, mc.height);
+  if (!local || !local.ok || !showing) return;
+  ctx.lineWidth = Math.max(2, mc.width / 220);
+  ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue("--flare").trim() || "#d9534f";
+  for (const s of local.spots) {
+    ctx.beginPath(); ctx.arc(s.x * mc.width, s.y * mc.height, Math.max(mc.width * 0.018, s.r * mc.width * 1.8), 0, Math.PI * 2); ctx.stroke();
+  }
+}
+
+async function onFile(file) {
+  if (!file) return;
+  try {
+    const img = await loadImage(file);
+    const big = cropCanvas(img, 960);
+    const pc = $("photoCanvas"); pc.width = big.width; pc.height = big.height; pc.getContext("2d").drawImage(big, 0, 0);
+    pc.hidden = false; $("markCanvas").hidden = false; $("frameEmpty").hidden = true;
+    const send = cropCanvas(img, 900);
+    const thumbC = cropCanvas(img, 600);
+    current = { blob: await toBlob(send, 0.86), thumb: toDataURL(thumbC, 0.72), local: analyzeLocal(big), ai: null, factors: new Set() };
+    drawMarks(current.local, true);
+    $("camLabel").textContent = "Retake";
+    $("resultCard").hidden = false; $("logCard").hidden = false;
+    $("products").value = (scans[0] && scans[0].products) || "";
+    $("note").value = "";
+    renderChips();
+    renderLocal(); renderAI();
+    const s = await getSample();
+    $("analyzeBtn").hidden = !s;
+    $("aiNote").textContent = s ? "Claude looks at the photo and counts each type of blemish. It takes about 15 seconds." : "Detailed analysis needs Claude, which isn't available in this view. Spot and redness estimates above still save.";
+    $("resultCard").scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
+  } catch (e) { toast("Couldn't read that photo. Try a JPEG or PNG."); }
+}
+$("camInput").addEventListener("change", (e) => { onFile(e.target.files[0]); e.target.value = ""; });
+$("fileInput").addEventListener("change", (e) => { onFile(e.target.files[0]); e.target.value = ""; });
+
+function renderLocal() {
+  const l = current && current.local, box = $("localResult");
+  if (!l || !l.ok) { box.innerHTML = `<p class="notice">Couldn't find enough skin inside the oval. Retake with your face filling the guide and even light.</p>`; return; }
+  const prev = scans.find((s) => s.local && s.local.ok);
+  const delta = prev ? l.spotCount - prev.local.spotCount : null;
+  box.innerHTML = `
+    <div class="row" style="justify-content:space-between;align-items:flex-start">
+      <div class="stack" style="gap:2px"><span class="label">Red spots found</span><b class="num" style="font-size:1.6rem">${l.spotCount}</b>
+        ${delta === null ? "" : `<span class="pill ${delta < 0 ? "good" : delta > 0 ? "bad" : ""}">${delta === 0 ? "Same as last scan" : (delta < 0 ? "▼ " : "▲ ") + Math.abs(delta) + " vs last scan"}</span>`}</div>
+      <div class="stack" style="gap:2px;text-align:right"><span class="label">Inflamed area</span><b class="num" style="font-size:1.6rem">${l.redPct}%</b><span class="small muted">of visible skin</span></div>
+    </div>
+    <p class="small muted">Circled on the photo. These quick estimates come from color alone, so lighting changes affect them.</p>`;
+}
+
+function iga(sev) { return GRADES[Math.max(0, Math.min(4, Math.round(sev / 2.5)))]; }
+function dialSVG(sev) {
+  const pct = Math.max(0, Math.min(10, sev)) / 10, r = 30, C = 2 * Math.PI * r;
+  const col = sev <= 2.5 ? "var(--accent)" : sev <= 5.5 ? "var(--warn)" : "var(--flare)";
+  return `<svg class="dial" viewBox="0 0 74 74" role="img" aria-label="Severity ${sev} of 10"><circle cx="37" cy="37" r="${r}" fill="none" stroke="var(--sunk)" stroke-width="8"/><circle cx="37" cy="37" r="${r}" fill="none" stroke="${col}" stroke-width="8" stroke-linecap="round" stroke-dasharray="${C * pct} ${C}" transform="rotate(-90 37 37)"/><text x="37" y="42" text-anchor="middle" fill="var(--ink)" style="font:600 17px var(--font-mono)">${esc(sev)}</text></svg>`;
+}
+
+function aiBlock(ai) {
+  const sev = Math.round(Number(ai.severity) * 10) / 10;
+  const counts = LESIONS.map(([k, lab]) => `<div><b>${esc(Number(ai.counts?.[k]) || 0)}</b><span>${lab}</span></div>`).join("");
+  return `
+    <div class="grade">${dialSVG(sev)}
+      <div class="stack" style="gap:4px"><span class="label">Severity</span><h3 style="font-size:1.2rem;font-weight:700">${esc(iga(sev))}</h3>
+      <p class="small muted">${esc(ai.summary || "")}</p></div></div>
+    <div class="counts">${counts}</div>
+    <div class="split"><div>${faceSVG(ai.zones || {})}</div>
+      <div class="stack small">${ZONES.map(([k, lab]) => `<div class="row" style="justify-content:space-between"><span>${lab}</span><span class="muted">${["none", "light", "some", "lots"][Math.max(0, Math.min(3, Number(ai.zones?.[k]) || 0))]}</span></div>`).join("")}
+      ${Number(ai.marks) > 0 ? `<div class="row" style="justify-content:space-between"><span>Dark marks / scars</span><span class="muted">${["none", "light", "some", "lots"][Math.min(3, Number(ai.marks))]}</span></div>` : ""}</div></div>
+    ${Array.isArray(ai.tips) && ai.tips.length ? `<div class="stack" style="gap:6px"><span class="label">Try this</span><ul class="plain small">${ai.tips.slice(0, 4).map((t) => `<li>${esc(t)}</li>`).join("")}</ul></div>` : ""}
+    ${ai.seeDerm ? `<p class="notice">This scan shows signs (deep or cystic spots, or possible scarring) that a dermatologist can treat best. Prescription options work well for these.</p>` : ""}`;
+}
+
+function renderAI() {
+  const box = $("aiResult");
+  if (!current || !current.ai) { box.innerHTML = ""; return; }
+  if (current.ai.notFace) { box.innerHTML = `<p class="notice">${esc(current.ai.summary || "Claude couldn't see a face clearly. Retake facing the camera in good light.")}</p>`; return; }
+  box.innerHTML = aiBlock(current.ai);
+}
+
+let analyzing = null;
+$("analyzeBtn").addEventListener("click", async () => {
+  if (!current || analyzing) return;
+  const s = await getSample(); if (!s) return;
+  const btn = $("analyzeBtn"); btn.disabled = true; btn.innerHTML = `<span class="spinner"></span> Analyzing`;
+  const prev = scans.find((x) => x.ai && !x.ai.notFace);
+  const prompt = `You are assisting a skincare progress-tracking app. The attached image is a selfie the user took to track their own acne over time. Assess the visible acne as a careful, conservative cosmetic observer (not a diagnosis).
+
+Return ONLY a JSON object with exactly these keys:
+{
+ "notFace": boolean (true if no human face is clearly visible),
+ "severity": number 0-10 with one decimal (0 = completely clear, 2.5 = almost clear, 5 = mild-moderate, 7.5 = moderate-severe, 10 = severe; keep it consistent with the IGA scale),
+ "counts": {"whiteheads": int, "blackheads": int, "papules": int, "pustules": int, "nodules": int} (visible lesions you can actually see; estimate when many),
+ "zones": {"forehead": 0-3, "nose": 0-3, "leftCheek": 0-3, "rightCheek": 0-3, "chin": 0-3, "jaw": 0-3} (0 none, 1 light, 2 some, 3 lots; left/right are the person's own left/right),
+ "marks": 0-3 (post-acne dark marks or scarring),
+ "summary": string, one or two plain sentences describing what you see,
+ "tips": array of 2-3 short, practical, evidence-based skincare suggestions tailored to what you see (e.g. ingredient + how to use). No brand names,
+ "seeDerm": boolean (true if nodules/cysts, scarring, or severity >= 7)
+}
+${prev ? `For consistency, their previous scan was rated severity ${prev.ai.severity} with counts ${JSON.stringify(prev.ai.counts)}. Rate this photo on its own merits but on the same scale.` : ""}
+If lighting or blur limits what you can see, say so in the summary.`;
+  analyzing = new AbortController();
+  try {
+    const ai = await s.json(prompt, { images: current.blob, modelTier: "default", signal: analyzing.signal });
+    if (!ai || typeof ai !== "object") throw { code: "invalid_json" };
+    ai.severity = Math.max(0, Math.min(10, Number(ai.severity) || 0));
+    current.ai = ai; renderAI();
+    $("aiNote").textContent = "";
+    btn.textContent = "Re-analyze";
+  } catch (e) {
+    const code = e && e.code;
+    $("aiNote").textContent = code === "not_granted" ? "Claude analysis is turned off for this page. You can still save the spot estimate." :
+      code === "rate_limited" ? "You've hit a usage limit. Wait a bit, then try again." :
+      code === "image_rejected" ? "That photo couldn't be sent. Try retaking it." :
+      "Analysis didn't finish. Try again in a moment.";
+    if (code === "not_granted") btn.hidden = true;
+    btn.textContent = "Analyze with Claude";
+  } finally { btn.disabled = false; analyzing = null; }
+});
+
+function renderChips() {
+  const box = $("factorChips"); box.innerHTML = "";
+  for (const [k, lab] of FACTORS) {
+    const b = document.createElement("button"); b.type = "button"; b.className = "chip"; b.id = "chip-" + k;
+    b.textContent = lab; b.setAttribute("aria-pressed", current && current.factors.has(k) ? "true" : "false");
+    b.addEventListener("click", () => { const on = !current.factors.has(k); on ? current.factors.add(k) : current.factors.delete(k); b.setAttribute("aria-pressed", String(on)); });
+    box.appendChild(b);
+  }
+}
+
+function resetScan() {
+  current = null;
+  $("photoCanvas").hidden = true; $("markCanvas").hidden = true; $("frameEmpty").hidden = false;
+  $("resultCard").hidden = true; $("logCard").hidden = true; $("camLabel").textContent = "Take selfie";
+  $("analyzeBtn").textContent = "Analyze with Claude";
+}
+$("discardBtn").addEventListener("click", resetScan);
+$("saveBtn").addEventListener("click", async () => {
+  if (!current || !store) return;
+  const btn = $("saveBtn"); btn.disabled = true; btn.textContent = "Saving…";
+  const now = new Date();
+  const scan = {
+    id: "s" + now.getTime().toString(36) + Math.random().toString(36).slice(2, 6),
+    at: now.toISOString(), day: dayKey(now),
+    photo: current.thumb,
+    local: current.local && current.local.ok ? { ok: true, spotCount: current.local.spotCount, redPct: current.local.redPct } : { ok: false },
+    ai: current.ai && !current.ai.notFace ? current.ai : null,
+    factors: [...current.factors],
+    products: $("products").value.trim().slice(0, 300),
+    note: $("note").value.trim().slice(0, 1000),
+  };
+  try { await store.save(scan); resetScan(); toast("Scan saved"); location.hash = "#progress"; }
+  catch (e) { toast((e && e.message) || "Couldn't save. Try again."); }
+  finally { btn.disabled = false; btn.textContent = "Save scan"; }
+});
+
+/* ---------------- helpers ---------------- */
+function dayKey(d) { return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); }
+const fmtDate = (iso) => new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+const fmtFull = (iso) => new Date(iso).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric", year: "numeric" });
+const lesionTotal = (s) => s.ai ? LESIONS.reduce((n, [k]) => n + (Number(s.ai.counts?.[k]) || 0), 0) : null;
+let toastT;
+function toast(msg) { let t = document.querySelector(".toast"); if (!t) { t = document.createElement("div"); t.className = "toast"; t.setAttribute("role", "status"); document.body.appendChild(t); } t.textContent = msg; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => (t.hidden = true), 2600); }
+
+function faceSVG(zones) {
+  const c = (k) => `var(--z${Math.max(0, Math.min(3, Number(zones[k]) || 0))})`;
+  // viewer-facing: person's left cheek appears on the right side of the image
+  return `<svg viewBox="0 0 140 170" width="100%" style="max-width:140px;display:block" role="img" aria-label="Face map of breakout areas">
+    <ellipse cx="70" cy="85" rx="58" ry="78" fill="var(--sunk)" stroke="var(--line)"/>
+    <path d="M20 58 Q22 14 70 8 Q118 14 120 58 Q70 50 20 58Z" fill="${c("forehead")}"/>
+    <path d="M60 64 L80 64 L84 108 Q70 114 56 108 Z" fill="${c("nose")}"/>
+    <path d="M16 72 Q30 66 52 70 L52 116 Q34 122 22 112 Q14 92 16 72Z" fill="${c("rightCheek")}"/>
+    <path d="M124 72 Q110 66 88 70 L88 116 Q106 122 118 112 Q126 92 124 72Z" fill="${c("leftCheek")}"/>
+    <path d="M24 118 Q34 128 50 126 L52 146 Q34 140 24 118Z" fill="${c("jaw")}"/>
+    <path d="M116 118 Q106 128 90 126 L88 146 Q106 140 116 118Z" fill="${c("jaw")}"/>
+    <path d="M54 130 Q70 136 86 130 L86 150 Q70 166 54 150Z" fill="${c("chin")}"/>
+    <g fill="none" stroke="var(--muted)" stroke-width="1.4" opacity=".7"><path d="M36 62 Q46 57 56 62M84 62 Q94 57 104 62"/><path d="M58 122 Q70 127 82 122"/></g>
+  </svg>`;
+}
+
+/* ---------------- progress ---------------- */
+let metric = "severity";
+$("metricSeg").addEventListener("click", (e) => { const b = e.target.closest("button"); if (!b) return; metric = b.dataset.m; for (const x of $("metricSeg").children) x.setAttribute("aria-pressed", String(x === b)); renderChart(); });
+
+function series() {
+  const asc = scans.slice().reverse();
+  const get = { severity: (s) => (s.ai ? s.ai.severity : null), lesions: (s) => lesionTotal(s) ?? (s.local?.ok ? s.local.spotCount : null), red: (s) => (s.local?.ok ? s.local.redPct : null) }[metric];
+  return asc.map((s) => ({ t: new Date(s.at).getTime(), v: get(s), s })).filter((p) => p.v !== null && p.v !== undefined);
+}
+
+function renderChart() {
+  const pts = series(), box = $("chartBox");
+  const W = 340, H = 170, pl = 30, pr = 10, pt = 12, pb = 24;
+  const names = { severity: "Severity (0 clear – 10 severe)", lesions: "Blemishes counted", red: "Inflamed skin %" };
+  if (pts.length < 2) {
+    const demo = [6.2, 5.8, 6.4, 5.1, 4.6, 4.9, 3.8, 3.2, 2.9];
+    const path = demo.map((v, i) => `${i ? "L" : "M"}${pl + (i / (demo.length - 1)) * (W - pl - pr)},${pt + (1 - v / 10) * (H - pt - pb)}`).join(" ");
+    box.innerHTML = `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Example chart"><path d="${path}" fill="none" stroke="var(--line)" stroke-width="2.5" stroke-dasharray="5 5"/><text x="${W / 2}" y="${H / 2}" text-anchor="middle" style="font:600 12px var(--font-body);fill:var(--muted)">Example trend · yours appears after 2 scans</text></svg>`;
+    $("chartNote").textContent = !scans.length ? "Take your first scan on the Scan tab."
+      : metric === "severity" && scans.length >= 2 ? "Severity comes from Claude's analysis. Analyze your scans to chart it, or switch to Breakouts or Redness."
+      : "One more scan and your trend line starts.";
+    return;
+  }
+  const t0 = pts[0].t, t1 = pts[pts.length - 1].t || t0 + 1;
+  let vmax = metric === "severity" ? 10 : Math.max(...pts.map((p) => p.v)) * 1.15 || 1;
+  vmax = metric === "severity" ? 10 : Math.ceil(vmax / 5) * 5;
+  const X = (t) => pl + (t1 === t0 ? 0.5 : (t - t0) / (t1 - t0)) * (W - pl - pr);
+  const Y = (v) => pt + (1 - v / vmax) * (H - pt - pb);
+  const ticks = [0, vmax / 2, vmax];
+  const grid = ticks.map((v) => `<line x1="${pl}" x2="${W - pr}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--line)" stroke-width="1"/><text x="${pl - 6}" y="${Y(v) + 3}" text-anchor="end">${Math.round(v * 10) / 10}</text>`).join("");
+  const line = pts.map((p, i) => `${i ? "L" : "M"}${X(p.t).toFixed(1)},${Y(p.v).toFixed(1)}`).join(" ");
+  const area = `${line} L${X(t1).toFixed(1)},${Y(0)} L${X(t0).toFixed(1)},${Y(0)} Z`;
+  const last = pts[pts.length - 1];
+  const dots = pts.map((p) => `<circle cx="${X(p.t).toFixed(1)}" cy="${Y(p.v).toFixed(1)}" r="${p === last ? 5 : 3}" fill="${p === last ? "var(--accent)" : "var(--surface)"}" stroke="var(--accent)" stroke-width="2"><title>${esc(fmtDate(p.s.at))}: ${esc(p.v)}</title></circle>`).join("");
+  const xl = `<text x="${pl}" y="${H - 6}">${esc(fmtDate(pts[0].s.at))}</text><text x="${W - pr}" y="${H - 6}" text-anchor="end">${esc(fmtDate(last.s.at))}</text>`;
+  box.innerHTML = `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(names[metric])} over time"><defs><linearGradient id="ga" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--accent)" stop-opacity=".28"/><stop offset="1" stop-color="var(--accent)" stop-opacity="0"/></linearGradient></defs>${grid}<path d="${area}" fill="url(#ga)"/><path d="${line}" fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linejoin="round"/>${dots}${xl}</svg>`;
+  $("chartNote").textContent = names[metric] + ". Lower is better." + (metric === "lesions" ? " Uses Claude's count when available, otherwise the red-spot estimate." : "");
+}
+
+function streak() {
+  const days = new Set(scans.map((s) => s.day));
+  const d = new Date(); let n = 0;
+  if (!days.has(dayKey(d))) d.setDate(d.getDate() - 1);
+  while (days.has(dayKey(d))) { n++; d.setDate(d.getDate() - 1); }
+  return n;
+}
+
+function renderProgress() {
+  const withAI = scans.filter((s) => s.ai);
+  const latest = withAI[0], first = withAI[withAI.length - 1];
+  $("stLatest").textContent = latest ? latest.ai.severity.toFixed(1) : (scans[0]?.local?.ok ? scans[0].local.spotCount : "–");
+  $("stLatestSub").textContent = latest ? iga(latest.ai.severity) : (scans[0] ? "red spots" : "severity / 10");
+  $("stStreak").textContent = streak();
+  const tp = $("trendPill");
+  if (latest && first && latest !== first) {
+    const d = latest.ai.severity - first.ai.severity;
+    $("stChange").textContent = (d > 0 ? "+" : "") + d.toFixed(1);
+    $("stChangeSub").textContent = "over " + Math.max(1, Math.round((new Date(latest.at) - new Date(first.at)) / 864e5)) + " days";
+    tp.hidden = false; tp.className = "pill " + (d < -0.4 ? "good" : d > 0.4 ? "bad" : "");
+    tp.textContent = d < -0.4 ? "Improving" : d > 0.4 ? "Flaring" : "Steady";
+  } else { $("stChange").textContent = "–"; $("stChangeSub").textContent = "change"; tp.hidden = true; }
+  renderChart();
+
+  // zone map: average of last 5 AI scans
+  const recent = withAI.slice(0, 5);
+  const avg = {}; for (const [k] of ZONES) avg[k] = recent.length ? recent.reduce((n, s) => n + (Number(s.ai.zones?.[k]) || 0), 0) / recent.length : 0;
+  $("faceMap").innerHTML = faceSVG(Object.fromEntries(Object.entries(avg).map(([k, v]) => [k, Math.round(v)])));
+  $("zoneList").innerHTML = recent.length
+    ? ZONES.slice().sort((a, b) => avg[b[0]] - avg[a[0]]).map(([k, lab]) => `<div class="row" style="justify-content:space-between"><span>${lab}</span><span class="num muted">${avg[k].toFixed(1)} / 3</span></div>`).join("") + `<p class="muted">Average of your last ${recent.length} analyzed scan${recent.length > 1 ? "s" : ""}.</p>`
+    : `<p class="muted">Analyze a scan with Claude to map which zones break out most. Chin and jawline spots often track hormones; forehead spots can track hair products.</p>`;
+
+  // compare
+  const opts = scans.map((s) => `<option value="${esc(s.id)}">${esc(fmtFull(s.at))}${s.ai ? " · " + esc(s.ai.severity.toFixed(1)) : ""}</option>`).join("");
+  const a = $("cmpA"), b = $("cmpB"), keepA = a.value, keepB = b.value;
+  a.innerHTML = opts; b.innerHTML = opts;
+  if (scans.length) {
+    a.value = scans.some((s) => s.id === keepA) ? keepA : scans[scans.length - 1].id;
+    b.value = scans.some((s) => s.id === keepB) ? keepB : scans[0].id;
+  }
+  updateCompare();
+
+  // insights: severity (or spot count) with vs without each factor
+  const val = (s) => (s.ai ? s.ai.severity : null);
+  const pool = scans.filter((s) => val(s) !== null);
+  const rows = [];
+  for (const [k, lab] of FACTORS) {
+    const yes = pool.filter((s) => (s.factors || []).includes(k)), no = pool.filter((s) => !(s.factors || []).includes(k));
+    if (yes.length >= 2 && no.length >= 2) {
+      const m = (l) => l.reduce((n, s) => n + val(s), 0) / l.length;
+      rows.push({ lab, d: m(yes) - m(no), n: yes.length });
+    }
+  }
+  rows.sort((x, y) => Math.abs(y.d) - Math.abs(x.d));
+  $("insights").innerHTML = rows.length
+    ? rows.slice(0, 6).map((r) => `<div class="insight"><span>${esc(r.lab)} <span class="small muted">· ${r.n} days</span></span><span class="pill ${r.d > 0.3 ? "bad" : r.d < -0.3 ? "good" : ""}">${r.d > 0.3 ? "Worse" : r.d < -0.3 ? "Better" : "No change"} ${r.d >= 0 ? "+" : ""}${r.d.toFixed(1)}</span></div>`).join("") + `<p class="small muted" style="margin-top:8px">Severity on days with the tag minus days without. Patterns need a few weeks of scans before they mean much.</p>`
+    : `<p class="small muted">Tag your days when you save a scan (sleep, stress, dairy, new products…). Once a tag shows up on at least 2 analyzed scans, and is missing on 2 others, Clearday shows whether your skin tends to be better or worse on those days.</p>`;
+}
+
+function updateCompare() {
+  const A = scans.find((s) => s.id === $("cmpA").value), B = scans.find((s) => s.id === $("cmpB").value);
+  const box = $("compare");
+  if (!A || !B) { $("cmpImgA").removeAttribute("src"); $("cmpImgB").removeAttribute("src"); box.style.display = "none"; return; }
+  box.style.display = ""; $("cmpImgA").src = A.photo; $("cmpImgB").src = B.photo;
+}
+$("cmpA").addEventListener("change", updateCompare);
+$("cmpB").addEventListener("change", updateCompare);
+$("cmpCut").addEventListener("input", (e) => $("compare").style.setProperty("--cut", e.target.value + "%"));
+
+/* ---------------- history ---------------- */
+let confirmId = null;
+function renderHistory() {
+  $("histCount").textContent = scans.length ? scans.length + " scan" + (scans.length > 1 ? "s" : "") : "";
+  const list = $("histList");
+  if (!scans.length) { list.innerHTML = `<div class="card"><h3>No scans yet</h3><p class="small muted">Each scan you save shows up here with its photo, severity and tags. Start on the Scan tab.</p><a class="btn primary" href="#scan">Take your first scan</a></div>`; return; }
+  list.innerHTML = scans.map((s) => {
+    const tags = (s.factors || []).map((k) => FACTORS.find((f) => f[0] === k)?.[1]).filter(Boolean);
+    const sev = s.ai ? `<span class="pill ${s.ai.severity <= 2.5 ? "good" : s.ai.severity >= 6 ? "bad" : "warn"}">${esc(iga(s.ai.severity))} · ${esc(s.ai.severity.toFixed(1))}</span>` : `<span class="pill">${s.local?.ok ? esc(s.local.spotCount) + " red spots" : "Photo only"}</span>`;
+    return `<div class="hitem"><img src="${esc(s.photo)}" alt="Scan from ${esc(fmtFull(s.at))}" loading="lazy">
+      <div class="meta"><b>${esc(fmtFull(s.at))}</b><div>${sev}</div>
+        ${tags.length ? `<p class="small muted">${esc(tags.join(" · "))}</p>` : ""}${s.note ? `<p class="small muted">${esc(s.note)}</p>` : ""}</div>
+      <div class="acts">${confirmId === s.id ? `<button class="danger" data-del="${esc(s.id)}">Delete</button><button data-cancel="1">Keep</button>` : `<button class="ghost" data-ask="${esc(s.id)}" aria-label="Delete scan from ${esc(fmtFull(s.at))}">Delete</button>`}</div></div>`;
+  }).join("");
+}
+$("histList").addEventListener("click", async (e) => {
+  const b = e.target.closest("button"); if (!b) return;
+  if (b.dataset.ask) { confirmId = b.dataset.ask; renderHistory(); }
+  else if (b.dataset.cancel) { confirmId = null; renderHistory(); }
+  else if (b.dataset.del) { const id = b.dataset.del; confirmId = null; try { await store.remove(id); toast("Scan deleted"); } catch { toast("Couldn't delete. Try again."); renderHistory(); } }
+});
+
+/* ---------------- routing / render ---------------- */
+function renderToday() {
+  const today = scans.find((s) => s.day === dayKey(new Date()));
+  const p = $("todayPill"); p.hidden = !today;
+  if (today) { p.className = "pill good"; p.textContent = "Scanned today ✓"; }
+}
+function renderAll() { renderToday(); renderProgress(); renderHistory(); }
+function route() {
+  const v = ["scan", "progress", "history"].includes(location.hash.slice(1)) ? location.hash.slice(1) : "scan";
+  for (const n of ["scan", "progress", "history"]) $("view-" + n).hidden = n !== v;
+  for (const a of document.querySelectorAll("nav.tabs a")) a.toggleAttribute("aria-current", a.dataset.v === v), a.dataset.v === v && a.setAttribute("aria-current", "page");
+  window.scrollTo(0, 0);
+}
+addEventListener("hashchange", route);
+route(); renderAll(); initStore();
+})();
+</script>
