@@ -2,9 +2,9 @@
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Figtree:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Figtree:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
 <style>
-/* Layout: one-column phone app, three views (Scan / Progress / History) behind a bottom tab bar. */
+/* Layout: one-column phone app, four views (Today / Progress / Routine / Learn) behind a bottom tab bar; reports open in a full-screen sheet. */
 :root {
   --bg: #f3f6f5;
   --surface: #ffffff;
@@ -15,9 +15,10 @@
   --accent: #0f8a7e;
   --accent-ink: #ffffff;
   --accent-soft: #d6efeb;
-  --flare: #d9534f;
+  --flare: #c94540;
   --flare-soft: #fbe3e1;
-  --warn: #b7791f;
+  --warn: #a8701a;
+  --warn-soft: #f8ecd6;
   --z0: #e3ece9; --z1: #f6d9c8; --z2: #ec9f86; --z3: #cf5a48;
   --font-display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
   --font-body: "Figtree", "Segoe UI", system-ui, -apple-system, sans-serif;
@@ -26,258 +27,427 @@
 }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
   --bg: #0d1719; --surface: #152226; --sunk: #1c2c30; --line: #2a3d42; --ink: #e4efed; --muted: #94aaad;
-  --accent: #3cc2b2; --accent-ink: #062521; --accent-soft: #163c39; --flare: #f07a72; --flare-soft: #3d2120; --warn: #e0a84a;
+  --accent: #3cc2b2; --accent-ink: #062521; --accent-soft: #163c39; --flare: #f07a72; --flare-soft: #3d2120; --warn: #e0a84a; --warn-soft: #3a2e17;
   --z0: #22353a; --z1: #5a3f35; --z2: #9a5443; --z3: #e0685a; color-scheme: dark } }
 :root[data-theme="dark"] {
   --bg: #0d1719; --surface: #152226; --sunk: #1c2c30; --line: #2a3d42; --ink: #e4efed; --muted: #94aaad;
-  --accent: #3cc2b2; --accent-ink: #062521; --accent-soft: #163c39; --flare: #f07a72; --flare-soft: #3d2120; --warn: #e0a84a;
+  --accent: #3cc2b2; --accent-ink: #062521; --accent-soft: #163c39; --flare: #f07a72; --flare-soft: #3d2120; --warn: #e0a84a; --warn-soft: #3a2e17;
   --z0: #22353a; --z1: #5a3f35; --z2: #9a5443; --z3: #e0685a; color-scheme: dark }
 
 * { box-sizing: border-box }
 [hidden] { display: none !important }
 html, body { background: var(--bg) }
-body { color: var(--ink); font: 15px/1.5 var(--font-body); }
+body { color: var(--ink); font: 15px/1.5 var(--font-body) }
 body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg) }
-.wrap { max-width: 560px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 18px calc(96px + env(safe-area-inset-bottom, 0px)); display: grid; gap: 18px }
-h1, h2, h3 { font-family: var(--font-display); text-wrap: balance; margin: 0; line-height: 1.15 }
+.wrap { max-width: 580px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 18px calc(100px + env(safe-area-inset-bottom, 0px)); display: grid; gap: 18px }
+h1, h2, h3, h4 { font-family: var(--font-display); text-wrap: balance; margin: 0; line-height: 1.15 }
 h1 { font-size: 1.75rem; font-weight: 700; letter-spacing: -0.01em }
-h2 { font-size: 1.2rem; font-weight: 700 }
-h3 { font-size: 1rem; font-weight: 500 }
+h2 { font-size: 1.25rem; font-weight: 700 }
+h3 { font-size: 1.05rem; font-weight: 700 }
+h4 { font-size: .95rem; font-weight: 500 }
 p { margin: 0 }
+a { color: var(--accent) }
 .muted { color: var(--muted) }
-.small { font-size: .85rem }
-.label { font-size: .72rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 600 }
+.small { font-size: .86rem }
+.tiny { font-size: .76rem }
+.label { font-size: .72rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 700 }
 .num { font-family: var(--font-mono); font-variant-numeric: tabular-nums }
 header.top { display: flex; align-items: center; justify-content: space-between; gap: 12px }
 .brand { display: flex; align-items: center; gap: 10px }
-.brand svg { flex: none }
-.status { font-size: .78rem; color: var(--muted); text-align: right }
-
+.status { font-size: .76rem; color: var(--muted); text-align: right; max-width: 14ch }
+section.view { display: grid; gap: 16px }
 .card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 16px; display: grid; gap: 14px; min-width: 0 }
-.stack { display: grid; gap: 10px }
+.stack { display: grid; gap: 10px; min-width: 0 }
 .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center }
+.between { justify-content: space-between }
+.grow { flex: 1 1 140px }
 
-button, .btn { font: 600 .95rem var(--font-body); border-radius: 999px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); padding: 10px 16px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px }
+button, .btn { font: 600 .95rem var(--font-body); border-radius: 999px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); padding: 10px 16px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; text-decoration: none; position: relative }
 button.primary, .btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent) }
 button.ghost { background: transparent }
 button.danger { color: var(--flare); border-color: var(--flare) }
+button.sm { min-height: 34px; padding: 4px 12px; font-size: .82rem }
 button:disabled { opacity: .5; cursor: default }
-button:focus-visible, .btn:focus-within, input:focus-visible, textarea:focus-visible, select:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px }
-.btn input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none }
-.btn { position: relative }
-.grow { flex: 1 1 140px }
+button:focus-visible, .btn:focus-within, input:focus-visible, textarea:focus-visible, select:focus-visible, summary:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px }
+.btn input[type=file] { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none }
 
-/* camera frame */
-.frame { position: relative; aspect-ratio: 4 / 5; max-width: 100%; border-radius: 18px; overflow: hidden; background: var(--sunk); display: grid; place-items: center }
-.frame canvas, .frame img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover }
-.frame .guide { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none }
-.frame .empty { position: relative; text-align: center; padding: 24px; display: grid; gap: 6px; justify-items: center; max-width: 30ch }
-.tips { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 14px; padding: 0; margin: 0; list-style: none; font-size: .85rem; color: var(--muted) }
+/* guided capture */
+.shots { display: grid; grid-template-columns: 1.4fr 1fr 1fr; gap: 10px }
+.shot { position: relative; aspect-ratio: 4 / 5; border-radius: 14px; overflow: hidden; background: var(--sunk); border: 2px dashed var(--line); display: grid; place-items: center; cursor: pointer; text-align: center; padding: 6px }
+.shot.filled { border-style: solid; border-color: var(--accent) }
+.shot img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover }
+.shot .cap { position: relative; display: grid; gap: 4px; justify-items: center; font-size: .78rem; color: var(--muted); font-weight: 600 }
+.shot .badge { position: absolute; left: 6px; bottom: 6px; background: rgba(0,0,0,.6); color: #fff; font: 600 .7rem var(--font-body); padding: 2px 8px; border-radius: 999px }
+.shot input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none }
+.shot:focus-within { outline: 3px solid var(--accent); outline-offset: 2px }
+.tips { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 14px; padding: 0; margin: 0; list-style: none; font-size: .84rem; color: var(--muted) }
 .tips li { display: flex; gap: 6px }
 .tips li::before { content: "✓"; color: var(--accent); font-weight: 700 }
+.progress-steps { display: grid; gap: 8px }
+.progress-steps div { display: flex; gap: 10px; align-items: center; font-size: .9rem; color: var(--muted) }
+.progress-steps div.on { color: var(--ink); font-weight: 600 }
+.progress-steps div.done { color: var(--accent) }
+.dot { width: 18px; height: 18px; border-radius: 50%; border: 2px solid var(--line); flex: none; display: grid; place-items: center; font-size: 11px }
+.on .dot { border-color: var(--accent); border-right-color: transparent; animation: spin .8s linear infinite }
+.done .dot { background: var(--accent); border-color: var(--accent); color: var(--accent-ink) }
+@keyframes spin { to { transform: rotate(360deg) } }
+@media (prefers-reduced-motion: reduce) { .on .dot { animation-duration: 3s } }
 
-/* results */
-.grade { display: flex; align-items: center; gap: 14px }
-.dial { width: 74px; height: 74px; flex: none }
-.pill { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 999px; font-size: .78rem; font-weight: 600; background: var(--sunk); color: var(--ink) }
+/* report */
+.hero { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 16px; align-items: center }
+.ring { width: 104px; height: 104px }
+.pill { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 999px; font-size: .76rem; font-weight: 700; background: var(--sunk); color: var(--ink); white-space: nowrap }
 .pill.good { background: var(--accent-soft); color: var(--accent) }
 .pill.bad { background: var(--flare-soft); color: var(--flare) }
-.pill.warn { background: var(--flare-soft); color: var(--warn) }
+.pill.warn { background: var(--warn-soft); color: var(--warn) }
 .counts { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px }
-.counts div { background: var(--sunk); border-radius: 10px; padding: 8px 4px; text-align: center; display: grid; gap: 2px }
-.counts b { font: 600 1.15rem var(--font-mono) }
-.counts span { font-size: .68rem; color: var(--muted); line-height: 1.2 }
-.split { display: grid; grid-template-columns: 140px minmax(0, 1fr); gap: 14px; align-items: center }
-@media (max-width: 380px) { .split { grid-template-columns: 1fr } .counts { grid-template-columns: repeat(3, minmax(0, 1fr)) } }
+.counts div { background: var(--sunk); border-radius: 10px; padding: 8px 2px; text-align: center; display: grid; gap: 1px }
+.counts b { font: 600 1.2rem var(--font-mono) }
+.counts span { font-size: .66rem; color: var(--muted); line-height: 1.2 }
+.counts .grp { font-size: .62rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted) }
+.metrics { display: grid; gap: 10px }
+.metric { display: grid; grid-template-columns: 96px minmax(0, 1fr) 38px; gap: 10px; align-items: center }
+.metric .name { font-size: .86rem; font-weight: 600 }
+.bar { height: 8px; border-radius: 999px; background: var(--sunk); overflow: hidden }
+.bar i { display: block; height: 100% ; border-radius: 999px }
+.metric .val { font: 600 .86rem var(--font-mono); text-align: right }
+.metric .note { grid-column: 2 / 4; font-size: .78rem; color: var(--muted); margin-top: -6px }
+.metric .delta { font-size: .7rem; font-weight: 700 }
+.split { display: grid; grid-template-columns: 140px minmax(0, 1fr); gap: 14px; align-items: start }
+.zone { display: grid; gap: 2px; padding-block: 6px; border-top: 1px solid var(--line) }
+.zone:first-child { border-top: 0; padding-top: 0 }
+.concern { display: grid; gap: 4px; padding: 10px 12px; border-radius: 10px; background: var(--sunk) }
+.concern.high { background: var(--flare-soft) }
+.concern.medium { background: var(--warn-soft) }
+.routine-out { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px }
+.routine-out ol { margin: 0; padding-left: 18px; display: grid; gap: 6px; font-size: .86rem }
 ul.plain { margin: 0; padding-left: 18px; display: grid; gap: 4px }
 .notice { border-radius: 10px; padding: 10px 12px; font-size: .88rem; background: var(--flare-soft); color: var(--ink) }
 .notice.info { background: var(--accent-soft) }
+.notice.warn { background: var(--warn-soft) }
+@media (max-width: 420px) { .split { grid-template-columns: 1fr } .split > :first-child { justify-self: center } .routine-out { grid-template-columns: 1fr } .counts { grid-template-columns: repeat(5, minmax(0, 1fr)) } .counts span { font-size: .6rem } }
 
-/* factors */
+/* check-in */
+.field { display: grid; gap: 8px }
 .chips { display: flex; flex-wrap: wrap; gap: 8px }
 .chip { font: 500 .85rem var(--font-body); border-radius: 999px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); padding: 6px 12px; min-height: 36px }
-.chip[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); color: var(--accent) }
-input[type=text], textarea { width: 100%; font: 400 .95rem var(--font-body); color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px }
+.chip[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); font-weight: 600 }
+.chip.bad[aria-pressed="true"] { background: var(--flare-soft); border-color: var(--flare); color: var(--flare) }
+.stepper { display: inline-flex; align-items: center; gap: 4px; background: var(--sunk); border-radius: 999px; padding: 3px }
+.stepper button { min-height: 34px; width: 34px; padding: 0; border: 0; background: var(--surface) }
+.stepper output { min-width: 3.4ch; text-align: center; font: 600 .95rem var(--font-mono) }
+.seg { display: inline-flex; background: var(--sunk); border-radius: 999px; padding: 3px; gap: 2px; flex-wrap: wrap }
+.seg button { min-height: 32px; padding: 4px 12px; border: 0; background: transparent; font-size: .82rem }
+.seg button[aria-pressed="true"] { background: var(--surface); box-shadow: 0 1px 2px rgba(0,0,0,.14) }
+.checkrow { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid var(--line); cursor: pointer }
+.checkrow:first-of-type { border-top: 0 }
+.checkrow input { width: 20px; height: 20px; accent-color: var(--accent); flex: none }
+.checkrow span { flex: 1; min-width: 0 }
+.twocol { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px }
+@media (max-width: 420px) { .twocol { grid-template-columns: 1fr } }
+input[type=text], input[type=date], textarea, select { width: 100%; min-width: 0; font: 400 .95rem var(--font-body); color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 9px 12px; min-height: 42px }
 textarea { min-height: 64px; resize: vertical }
 
 /* progress */
 .stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px }
 .stat { display: grid; gap: 2px; min-width: 0 }
-.stat b { font: 600 1.4rem var(--font-mono); font-variant-numeric: tabular-nums }
-.seg { display: inline-flex; background: var(--sunk); border-radius: 999px; padding: 3px; gap: 2px }
-.seg button { min-height: 32px; padding: 4px 12px; border: 0; background: transparent; font-size: .82rem }
-.seg button[aria-pressed="true"] { background: var(--surface); box-shadow: 0 1px 2px rgba(0,0,0,.12) }
+.stat b { font: 600 1.45rem var(--font-mono); font-variant-numeric: tabular-nums }
 .chart { width: 100%; height: auto; display: block }
 .chart text { fill: var(--muted); font: 10px var(--font-mono) }
+.legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: .78rem; color: var(--muted) }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 5px; vertical-align: -1px }
+.adh { display: grid; grid-template-columns: 34px repeat(14, minmax(0, 1fr)); gap: 4px; align-items: center; font-size: .7rem; color: var(--muted) }
+.adh i { aspect-ratio: 1; border-radius: 4px; background: var(--sunk); display: block }
+.adh i.full { background: var(--accent) }
+.adh i.part { background: color-mix(in srgb, var(--accent) 45%, var(--sunk)) }
 .insight { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: center; padding-block: 8px; border-top: 1px solid var(--line) }
 .insight:first-child { border-top: 0 }
-.compare { position: relative; aspect-ratio: 4 / 5; max-width: 100%; border-radius: 14px; overflow: hidden; background: var(--sunk); touch-action: pan-y }
+.compare { position: relative; aspect-ratio: 4 / 5; max-width: 100%; border-radius: 14px; overflow: hidden; background: var(--sunk) }
 .compare img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover }
 .compare .after { clip-path: inset(0 0 0 var(--cut, 50%)) }
 .compare .handle { position: absolute; top: 0; bottom: 0; left: var(--cut, 50%); width: 2px; background: #fff; box-shadow: 0 0 0 1px rgba(0,0,0,.25) }
 .compare .tag { position: absolute; top: 10px; padding: 2px 8px; border-radius: 999px; font: 600 .72rem var(--font-body); background: rgba(0,0,0,.55); color: #fff }
 input[type=range] { width: 100%; accent-color: var(--accent) }
-select { font: 500 .88rem var(--font-body); color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; min-height: 40px; width: 100%; min-width: 0 }
-.pickers { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px }
-
-/* history */
 .hist { display: grid; gap: 10px }
-.hitem { display: grid; grid-template-columns: 64px minmax(0, 1fr) auto; gap: 12px; align-items: center; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 10px }
-.hitem img { width: 64px; height: 80px; object-fit: cover; border-radius: 10px; background: var(--sunk) }
-.hitem .meta { display: grid; gap: 4px; min-width: 0 }
-.hitem .meta p { overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
+.hitem { display: grid; grid-template-columns: 56px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding-block: 8px; border-top: 1px solid var(--line) }
+.hitem:first-child { border-top: 0 }
+.hitem img { width: 56px; height: 70px; object-fit: cover; border-radius: 10px; background: var(--sunk) }
+.hitem .meta { display: grid; gap: 3px; min-width: 0 }
 .hitem .acts { display: grid; gap: 6px; justify-items: end }
-.hitem .acts button { min-height: 34px; padding: 4px 12px; font-size: .8rem }
+.aiText p + p { margin-top: 8px }
 
-/* tab bar */
+/* routine */
+.step { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: center; padding-block: 10px; border-top: 1px solid var(--line) }
+.step:first-child { border-top: 0 }
+.step .meta { display: grid; gap: 2px; min-width: 0 }
+.addform { display: grid; gap: 10px; padding: 12px; border-radius: 12px; background: var(--sunk) }
+.weeks { height: 8px; border-radius: 999px; background: var(--sunk); overflow: hidden }
+.weeks i { display: block; height: 100%; background: var(--accent) }
+
+/* learn */
+details.learn { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 0 16px }
+details.learn summary { list-style: none; cursor: pointer; padding: 14px 0; display: flex; justify-content: space-between; gap: 10px; align-items: center; font: 700 1.02rem var(--font-display) }
+details.learn summary::-webkit-details-marker { display: none }
+details.learn summary::after { content: "+"; font: 400 1.4rem var(--font-body); color: var(--muted) }
+details.learn[open] summary::after { content: "–" }
+details.learn .body { padding-bottom: 16px; display: grid; gap: 10px; font-size: .92rem }
+.tbl { overflow-x: auto }
+.tbl table { border-collapse: collapse; width: 100%; font-size: .84rem; min-width: 440px }
+.tbl th, .tbl td { text-align: left; padding: 7px 8px; border-top: 1px solid var(--line); vertical-align: top }
+.tbl th { font-size: .7rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); border-top: 0 }
+.ev { display: inline-block; font-size: .68rem; font-weight: 700; padding: 1px 7px; border-radius: 999px }
+.ev.s { background: var(--accent-soft); color: var(--accent) }
+.ev.m { background: var(--warn-soft); color: var(--warn) }
+.ev.w { background: var(--sunk); color: var(--muted) }
+
+/* sheet + nav */
+.sheet { position: fixed; inset: 0; z-index: 40; background: var(--bg); overflow-y: auto; padding-top: env(safe-area-inset-top, 0px) }
+.sheet .wrap { padding-block: 12px calc(40px + env(safe-area-inset-bottom, 0px)) }
 nav.tabs { position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; background: var(--surface); border-top: 1px solid var(--line); padding-bottom: env(safe-area-inset-bottom, 0px); padding-left: max(8px, env(safe-area-inset-left, 0px)); padding-right: max(8px, env(safe-area-inset-right, 0px)) }
-nav.tabs .in { max-width: 560px; margin: 0 auto; display: grid; grid-template-columns: repeat(3, 1fr) }
-nav.tabs a { display: grid; justify-items: center; gap: 2px; padding: 8px 4px 10px; color: var(--muted); text-decoration: none; font-size: .75rem; font-weight: 600 }
+nav.tabs .in { max-width: 580px; margin: 0 auto; display: grid; grid-template-columns: repeat(4, 1fr) }
+nav.tabs a { display: grid; justify-items: center; gap: 2px; padding: 8px 4px 10px; color: var(--muted); text-decoration: none; font-size: .74rem; font-weight: 700 }
 nav.tabs a[aria-current="page"] { color: var(--accent) }
 nav.tabs a:focus-visible { outline: 3px solid var(--accent); outline-offset: -3px; border-radius: 8px }
 nav.tabs svg { width: 24px; height: 24px }
-
-.spinner { width: 18px; height: 18px; border-radius: 50%; border: 2px solid currentColor; border-right-color: transparent; animation: spin .8s linear infinite }
-@keyframes spin { to { transform: rotate(360deg) } }
-@media (prefers-reduced-motion: reduce) { .spinner { animation-duration: 3s } }
-.toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(84px + env(safe-area-inset-bottom, 0px)); background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 999px; font-weight: 600; font-size: .9rem; z-index: 30; max-width: calc(100% - 32px) }
-.disclaimer { font-size: .78rem; color: var(--muted); text-align: center; max-width: 52ch; justify-self: center }
+.toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(86px + env(safe-area-inset-bottom, 0px)); background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 999px; font-weight: 600; font-size: .9rem; z-index: 50; max-width: calc(100% - 32px); text-align: center }
+.disclaimer { font-size: .76rem; color: var(--muted); text-align: center; max-width: 52ch; justify-self: center }
+.saved { font-size: .76rem; color: var(--muted) }
 </style>
 
 <div class="wrap">
   <header class="top">
     <div class="brand">
       <svg width="34" height="34" viewBox="0 0 34 34" aria-hidden="true"><ellipse cx="17" cy="17" rx="12" ry="15" fill="none" stroke="var(--accent)" stroke-width="2.5"/><circle cx="12.5" cy="15" r="1.8" fill="var(--flare)"/><circle cx="21" cy="21" r="1.3" fill="var(--flare)" opacity=".6"/></svg>
-      <div><h1>Clearday</h1><p class="small muted">Your acne progress, one scan a day</p></div>
+      <div><h1>Clearday</h1><p class="small muted" id="greeting">Your skin, tracked properly</p></div>
     </div>
     <p class="status" id="storeStatus">Loading…</p>
   </header>
 
-  <!-- SCAN VIEW -->
-  <section id="view-scan" class="stack" style="gap:18px">
-    <div class="card">
-      <div class="row" style="justify-content:space-between">
-        <h2 id="scanTitle">Today's scan</h2>
-        <span class="pill" id="todayPill" hidden></span>
-      </div>
-      <div class="frame" id="frame">
-        <canvas id="photoCanvas" hidden></canvas>
-        <canvas id="markCanvas" hidden></canvas>
-        <svg class="guide" viewBox="0 0 400 500" preserveAspectRatio="none" aria-hidden="true">
-          <ellipse cx="200" cy="235" rx="144" ry="210" fill="none" stroke="var(--accent)" stroke-width="3" stroke-dasharray="10 8" opacity=".85"/>
-        </svg>
-        <div class="empty" id="frameEmpty">
-          <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.8" aria-hidden="true"><path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2"/><circle cx="12" cy="12" r="3.5"/></svg>
-          <h3>Line your face up in the oval</h3>
-          <p class="small muted">Take a front-facing selfie. Use the same spot and light each day so scans compare fairly.</p>
-        </div>
-      </div>
-      <div class="row">
-        <label class="btn primary grow" for="camInput">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>
-          <span id="camLabel">Take selfie</span>
-          <input id="camInput" type="file" accept="image/*" capture="user">
-        </label>
-        <label class="btn grow" for="fileInput">Upload photo<input id="fileInput" type="file" accept="image/*"></label>
+  <!-- TODAY -->
+  <section class="view" id="view-today">
+    <div class="card" id="scanCard">
+      <div class="row between"><h2>Skin scan</h2><span class="pill" id="todayPill" hidden></span></div>
+      <p class="small muted">Take a straight-on photo. Side photos let Claude see your cheeks and jawline, where a lot of acne hides.</p>
+      <div class="shots">
+        <label class="shot" id="shot-front" for="in-front"><div class="cap"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.8" aria-hidden="true"><ellipse cx="12" cy="12" rx="6.5" ry="8.5"/><path d="M9.5 10.5h.01M14.5 10.5h.01M10 15.5q2 1.2 4 0"/></svg>Front<br><span class="tiny">required</span></div><input id="in-front" type="file" accept="image/*" capture="user"></label>
+        <label class="shot" id="shot-left" for="in-left"><div class="cap"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="1.8" aria-hidden="true"><path d="M14 3.5c-4 0-7 3.6-7 8.5s3 8.5 7 8.5c1 0 2-.6 2-2v-2l2-1-1.5-3 1.5-1c-.5-4-2-8-4-8Z"/></svg>Left side<br><span class="tiny">optional</span></div><input id="in-left" type="file" accept="image/*" capture="user"></label>
+        <label class="shot" id="shot-right" for="in-right"><div class="cap"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="1.8" aria-hidden="true" style="transform:scaleX(-1)"><path d="M14 3.5c-4 0-7 3.6-7 8.5s3 8.5 7 8.5c1 0 2-.6 2-2v-2l2-1-1.5-3 1.5-1c-.5-4-2-8-4-8Z"/></svg>Right side<br><span class="tiny">optional</span></div><input id="in-right" type="file" accept="image/*" capture="user"></label>
       </div>
       <ul class="tips">
-        <li>Daylight, facing a window</li>
-        <li>No makeup or filters</li>
-        <li>Hair pulled back</li>
-        <li>Same distance each time</li>
+        <li>Face a window, daylight</li><li>Clean skin, no makeup</li>
+        <li>Hair back, no glasses</li><li>Same spot every time</li>
       </ul>
-    </div>
-
-    <div class="card" id="resultCard" hidden>
-      <div class="row" style="justify-content:space-between">
-        <h2>Scan results</h2>
-        <button class="primary" id="analyzeBtn">Analyze with Claude</button>
-      </div>
-      <div id="localResult" class="stack"></div>
-      <div id="aiResult" class="stack"></div>
-      <p class="small muted" id="aiNote"></p>
-    </div>
-
-    <div class="card" id="logCard" hidden>
-      <h2>What happened today?</h2>
-      <p class="small muted">Tag anything that might matter. Clearday compares your skin on days with and without each tag.</p>
-      <div class="chips" id="factorChips"></div>
-      <label class="stack" for="products"><span class="label">Products used</span>
-        <input id="products" type="text" placeholder="e.g. benzoyl peroxide 2.5%, moisturizer">
-      </label>
-      <label class="stack" for="note"><span class="label">Note</span>
-        <textarea id="note" placeholder="Anything else: new spot on chin, skin felt dry…"></textarea>
-      </label>
       <div class="row">
-        <button class="primary grow" id="saveBtn">Save scan</button>
-        <button class="ghost" id="discardBtn">Discard</button>
+        <button class="primary grow" id="analyzeBtn" disabled>Analyze my skin</button>
+        <button class="ghost" id="clearShots" hidden>Clear</button>
       </div>
+      <p class="small muted" id="scanHint">Add a front photo to start. The analysis takes about 30 seconds.</p>
+      <div class="progress-steps" id="steps" hidden></div>
+      <div id="scanError" hidden></div>
+    </div>
+
+    <div class="card" id="latestCard" hidden>
+      <div class="row between"><h3>Latest report</h3><button class="sm" id="openLatest">Open full report</button></div>
+      <div id="latestSummary"></div>
+    </div>
+
+    <div class="card" id="checkinCard">
+      <div class="row between"><h2>Daily check-in</h2><span class="saved" id="ciSaved"></span></div>
+      <p class="small muted">Acne usually reacts to triggers 1–3 days later, so a quick log every day is what makes the patterns show up. It saves as you tap.</p>
+      <div class="field" id="ciRoutine"></div>
+      <div class="twocol">
+        <div class="field"><span class="label">Sleep last night</span><div class="stepper" id="st-sleep"><button type="button" aria-label="Less sleep">−</button><output>–</output><button type="button" aria-label="More sleep">+</button></div></div>
+        <div class="field"><span class="label">Water (glasses)</span><div class="stepper" id="st-water"><button type="button" aria-label="Fewer glasses">−</button><output>–</output><button type="button" aria-label="More glasses">+</button></div></div>
+      </div>
+      <div class="field"><span class="label">Stress</span><div class="seg" id="seg-stress" role="group" aria-label="Stress level"></div></div>
+      <div class="field"><span class="label">New spots since yesterday</span><div class="stepper" id="st-newspots"><button type="button" aria-label="Fewer">−</button><output>–</output><button type="button" aria-label="More">+</button></div></div>
+      <div class="field"><span class="label">Skin feels</span><div class="chips" id="ch-feel"></div></div>
+      <div class="field"><span class="label">Food &amp; drink</span><div class="chips" id="ch-food"></div></div>
+      <div class="field"><span class="label">Habits</span><div class="chips" id="ch-habit"></div></div>
+      <label class="field" for="ciNote"><span class="label">Note</span><textarea id="ciNote" placeholder="New product, big event, sore spot on chin…"></textarea></label>
     </div>
   </section>
 
-  <!-- PROGRESS VIEW -->
-  <section id="view-progress" class="stack" style="gap:18px" hidden>
+  <!-- PROGRESS -->
+  <section class="view" id="view-progress" hidden>
     <div class="card">
-      <div class="row" style="justify-content:space-between"><h2>Progress</h2><span class="pill" id="trendPill"></span></div>
+      <div class="row between"><h2>Progress</h2><span class="pill" id="trendPill" hidden></span></div>
       <div class="stats">
-        <div class="stat"><span class="label">Latest</span><b id="stLatest">–</b><span class="small muted" id="stLatestSub">severity / 10</span></div>
-        <div class="stat"><span class="label">Since first</span><b id="stChange">–</b><span class="small muted" id="stChangeSub">change</span></div>
-        <div class="stat"><span class="label">Streak</span><b id="stStreak">0</b><span class="small muted">days in a row</span></div>
+        <div class="stat"><span class="label">Skin score</span><b id="stScore">–</b><span class="tiny muted" id="stScoreSub">out of 100</span></div>
+        <div class="stat"><span class="label">Active spots</span><b id="stActive">–</b><span class="tiny muted" id="stActiveSub">on latest scan</span></div>
+        <div class="stat"><span class="label">Check-ins</span><b id="stStreak">0</b><span class="tiny muted">day streak</span></div>
       </div>
     </div>
     <div class="card">
-      <div class="row" style="justify-content:space-between">
-        <h3>Over time</h3>
-        <div class="seg" role="group" aria-label="Chart metric" id="metricSeg">
-          <button aria-pressed="true" data-m="severity">Severity</button>
-          <button aria-pressed="false" data-m="lesions">Breakouts</button>
-          <button aria-pressed="false" data-m="red">Redness</button>
-        </div>
-      </div>
+      <div class="row between"><h3>Over time</h3><select id="metricSel" aria-label="Chart metric" style="width:auto;max-width:60%"></select></div>
       <div id="chartBox"></div>
-      <p class="small muted" id="chartNote"></p>
+      <div class="legend" id="chartLegend"></div>
+      <p class="tiny muted" id="chartNote"></p>
+    </div>
+    <div class="card">
+      <h3>Skin breakdown</h3>
+      <p class="tiny muted">Latest scan, with the change since the scan before. Higher is better for every bar.</p>
+      <div class="metrics" id="progMetrics"></div>
     </div>
     <div class="card">
       <h3>Where breakouts show up</h3>
-      <div class="split">
-        <div id="faceMap"></div>
-        <div class="stack small" id="zoneList"></div>
-      </div>
+      <div class="split"><div id="faceMap"></div><div id="zoneList"></div></div>
+    </div>
+    <div class="card">
+      <div class="row between"><h3>Routine consistency</h3><span class="small muted" id="adhPct"></span></div>
+      <div id="adhGrid"></div>
+      <p class="tiny muted">Last 14 days. Treatments only work if you use them most days, for weeks.</p>
+    </div>
+    <div class="card">
+      <h3>What affects your skin</h3>
+      <div id="insights"></div>
+      <button id="askPatterns" hidden>Ask Claude to read my patterns</button>
+      <div id="patternOut" class="aiText small"></div>
     </div>
     <div class="card">
       <h3>Before &amp; after</h3>
-      <div class="pickers">
-        <label class="stack" for="cmpA"><span class="label">Before</span><select id="cmpA"></select></label>
-        <label class="stack" for="cmpB"><span class="label">After</span><select id="cmpB"></select></label>
+      <div class="twocol">
+        <label class="field" for="cmpA"><span class="label">Before</span><select id="cmpA"></select></label>
+        <label class="field" for="cmpB"><span class="label">After</span><select id="cmpB"></select></label>
       </div>
-      <div class="compare" id="compare">
-        <img id="cmpImgA" alt="Before photo">
-        <img id="cmpImgB" class="after" alt="After photo">
-        <div class="handle"></div>
-        <span class="tag" style="left:10px">Before</span><span class="tag" style="right:10px">After</span>
-      </div>
-      <label for="cmpCut" class="small muted">Drag to compare</label>
+      <div class="compare" id="compare"><img id="cmpImgA" alt="Before photo"><img id="cmpImgB" class="after" alt="After photo"><div class="handle"></div><span class="tag" style="left:10px">Before</span><span class="tag" style="right:10px">After</span></div>
+      <label for="cmpCut" class="tiny muted">Drag to compare</label>
       <input id="cmpCut" type="range" min="0" max="100" value="50">
     </div>
     <div class="card">
-      <h3>Triggers to watch</h3>
-      <div id="insights"></div>
+      <div class="row between"><h3>All scans</h3><span class="small muted" id="histCount"></span></div>
+      <div class="hist" id="histList"></div>
     </div>
   </section>
 
-  <!-- HISTORY VIEW -->
-  <section id="view-history" class="stack" hidden>
-    <div class="row" style="justify-content:space-between"><h2>All scans</h2><span class="small muted" id="histCount"></span></div>
-    <div class="hist" id="histList"></div>
+  <!-- ROUTINE -->
+  <section class="view" id="view-routine" hidden>
+    <div class="card">
+      <h2>My routine</h2>
+      <p class="small muted">Add what you actually use. Clearday ticks it off in your daily check-in, counts the weeks on each treatment, and flags combinations that clash.</p>
+      <div id="routineWarn" class="stack"></div>
+    </div>
+    <div class="card"><div class="row between"><h3>Morning</h3><button class="sm" data-add="am">+ Add step</button></div><div id="list-am"></div></div>
+    <div class="card"><div class="row between"><h3>Evening</h3><button class="sm" data-add="pm">+ Add step</button></div><div id="list-pm"></div></div>
+    <div class="card" id="timelineCard" hidden><h3>Treatment timeline</h3><div id="timelines" class="stack"></div></div>
   </section>
 
-  <p class="disclaimer">Clearday gives cosmetic estimates, not a diagnosis. For painful nodules or cysts, scarring, or acne that isn't improving after 8–12 weeks of treatment, see a dermatologist.</p>
+  <!-- LEARN -->
+  <section class="view" id="view-learn" hidden>
+    <div class="card">
+      <h2>What good skin actually is</h2>
+      <p class="small">Dermatology panels describe healthy-looking skin with four qualities: <b>even tone</b> (no blotches or marks), <b>even surface</b> (smooth, small pores, no bumps or scars), <b>firmness</b>, and <b>glow</b> (light reflects evenly, no dullness or flaking). For acne-prone skin that means six things Clearday scores on every scan:</p>
+      <div class="tbl"><table>
+        <thead><tr><th>Score</th><th>What it measures</th><th>What moves it</th></tr></thead>
+        <tbody>
+          <tr><td><b>Clarity</b></td><td>Active spots: blackheads, whiteheads, red bumps, pus spots, deep spots</td><td>Retinoids, benzoyl peroxide, salicylic or azelaic acid, given 8–12 weeks</td></tr>
+          <tr><td><b>Calmness</b></td><td>Redness and inflammation around spots and across the cheeks</td><td>Azelaic acid, niacinamide, not over-exfoliating, not picking</td></tr>
+          <tr><td><b>Even tone</b></td><td>Red marks (PIE) and brown marks (PIH) left after spots heal</td><td>Daily SPF 30+, azelaic acid, retinoids, time (3–12 months)</td></tr>
+          <tr><td><b>Smoothness</b></td><td>Texture, small bumps, scars</td><td>Retinoids for bumps; scars need a dermatologist</td></tr>
+          <tr><td><b>Pores &amp; oil</b></td><td>How visible pores are, shine on the T-zone</td><td>Salicylic acid, retinoids, niacinamide, gentle cleansing</td></tr>
+          <tr><td><b>Hydration &amp; glow</b></td><td>Flaking, tightness, dullness, a stressed skin barrier</td><td>Moisturizer, fewer actives at once, gentle cleanser</td></tr>
+        </tbody>
+      </table></div>
+    </div>
+
+    <details class="learn"><summary>How a spot forms</summary><div class="body">
+      <p>Every acne spot starts in a hair follicle (pore). Four things drive it:</p>
+      <ul class="plain"><li><b>Oil:</b> hormones (androgens) make oil glands produce more sebum.</li><li><b>Clogging:</b> dead skin cells stick together and plug the pore. This is a blackhead or whitehead.</li><li><b>Bacteria:</b> <i>C. acnes</i> grows in the trapped oil.</li><li><b>Inflammation:</b> the immune system reacts, making a red bump, pus spot, or a deep nodule.</li></ul>
+      <p>The plug forms weeks before you see a spot, which is why treatments take 8–12 weeks to show their full effect, and why a new product rarely explains a spot that appeared the next day.</p>
+    </div></details>
+
+    <details class="learn"><summary>The types of spots</summary><div class="body"><div class="tbl"><table>
+      <thead><tr><th>Type</th><th>Looks like</th><th>Best options</th></tr></thead>
+      <tbody>
+        <tr><td><b>Blackhead</b></td><td>Open pore, dark top (oxidized oil, not dirt)</td><td>Salicylic acid, adapalene</td></tr>
+        <tr><td><b>Whitehead</b></td><td>Closed, small skin-colored or white bump</td><td>Adapalene, salicylic acid</td></tr>
+        <tr><td><b>Papule</b></td><td>Red, tender bump, no white head</td><td>Benzoyl peroxide, adapalene, azelaic acid</td></tr>
+        <tr><td><b>Pustule</b></td><td>Red bump with a white or yellow center</td><td>Benzoyl peroxide; don't squeeze</td></tr>
+        <tr><td><b>Nodule / cyst</b></td><td>Large, deep, painful lump under the skin</td><td>See a dermatologist; these scar easily</td></tr>
+      </tbody></table></div>
+      <p class="small muted">Blackheads and whiteheads are "comedones" (non-inflamed). Papules, pustules and nodules are inflamed. Dermatologists track the two groups separately because they respond to different treatments.</p>
+    </div></details>
+
+    <details class="learn"><summary>Marks vs scars</summary><div class="body">
+      <ul class="plain">
+        <li><b>Red or purple marks (PIE):</b> flat, from damaged small blood vessels. Press a clear glass on it: if it fades, it's PIE. Fades over months; azelaic acid and SPF help.</li>
+        <li><b>Brown marks (PIH):</b> flat, extra pigment. More common and longer-lasting on deeper skin tones. Sunscreen every day is the single biggest factor; azelaic acid and retinoids speed fading.</li>
+        <li><b>Scars:</b> a change in texture. <i>Icepick</i> (narrow, deep), <i>boxcar</i> (wide, sharp edges), <i>rolling</i> (wavy). Creams won't fix these; dermatologists use microneedling, lasers, or subcision.</li>
+      </ul>
+      <p>Picking turns a spot that would have healed cleanly into a mark or scar. That's why "picked skin" is in your check-in.</p>
+    </div></details>
+
+    <details class="learn"><summary>Ingredients that work</summary><div class="body"><div class="tbl"><table>
+      <thead><tr><th>Ingredient</th><th>Targets</th><th>Know this</th></tr></thead>
+      <tbody>
+        <tr><td><b>Adapalene 0.1%</b> (OTC retinoid)</td><td>Clogging, comedones, marks</td><td>Pea-size at night. Dryness and a possible "purge" in weeks 2–6. Full effect 12 weeks.</td></tr>
+        <tr><td><b>Tretinoin</b> (prescription)</td><td>Same, stronger</td><td>Don't apply at the same time as benzoyl peroxide.</td></tr>
+        <tr><td><b>Benzoyl peroxide 2.5–5%</b></td><td>Bacteria, inflamed spots</td><td>2.5% works about as well as 10% with less irritation. Bleaches towels.</td></tr>
+        <tr><td><b>Salicylic acid 0.5–2%</b></td><td>Blackheads, oil</td><td>Oil-soluble, gets into pores. Good as a cleanser.</td></tr>
+        <tr><td><b>Azelaic acid 10–20%</b></td><td>Inflammation, red and brown marks</td><td>Gentle; considered safe in pregnancy.</td></tr>
+        <tr><td><b>Niacinamide 2–5%</b></td><td>Redness, oil, barrier</td><td>Easy to pair with everything.</td></tr>
+        <tr><td><b>Sunscreen SPF 30+</b></td><td>Stops marks darkening</td><td>Essential when using retinoids or acids.</td></tr>
+        <tr><td><b>Moisturizer</b></td><td>Barrier, irritation</td><td>Makes actives tolerable. Look for "non-comedogenic".</td></tr>
+      </tbody></table></div>
+      <p class="small muted">Start one new active at a time, about 2 weeks apart, so you know what's causing irritation or improvement.</p>
+    </div></details>
+
+    <details class="learn"><summary>Lifestyle: what the evidence says</summary><div class="body"><div class="tbl"><table>
+      <thead><tr><th>Factor</th><th>Evidence</th><th>Summary</th></tr></thead>
+      <tbody>
+        <tr><td>High-sugar, refined-carb diet</td><td><span class="ev s">Moderate</span></td><td>Randomized trials link high-glycemic diets to more acne. The AAD says a low-glycemic diet may reduce spots.</td></tr>
+        <tr><td>Milk (especially skim)</td><td><span class="ev m">Mixed</span></td><td>Meta-analyses find an association with milk; yogurt and cheese show no link.</td></tr>
+        <tr><td>Whey protein</td><td><span class="ev m">Some</span></td><td>Case reports and observational studies link whey supplements to acne, mostly in young men.</td></tr>
+        <tr><td>Picking / squeezing</td><td><span class="ev s">Strong</span></td><td>Raises the risk of marks, scars and infection.</td></tr>
+        <tr><td>Sleep</td><td><span class="ev w">Weak</span></td><td>Small studies link poor sleep and morning fatigue with worse acne.</td></tr>
+        <tr><td>Stress</td><td><span class="ev w">Weak</span></td><td>Seems to worsen existing acne rather than cause it.</td></tr>
+        <tr><td>Friction (phone, helmet, mask, pillowcase)</td><td><span class="ev w">Weak</span></td><td>Pressure and rubbing can cause "acne mechanica" in the area touched.</td></tr>
+        <tr><td>Chocolate, greasy food</td><td><span class="ev w">Weak</span></td><td>Little direct evidence beyond their sugar content.</td></tr>
+      </tbody></table></div>
+      <p class="small muted">Triggers differ between people. That's the point of logging: your own data beats general advice.</p>
+    </div></details>
+
+    <details class="learn"><summary>What to track, and why</summary><div class="body">
+      <ul class="plain">
+        <li><b>Spot counts by type.</b> The most reliable measure; it's what clinical trials use.</li>
+        <li><b>A severity grade.</b> Dermatologists' 0–4 scale (Clear, Almost clear, Mild, Moderate, Severe). Useful context, but less consistent than counts.</li>
+        <li><b>Marks and scarring</b> separately from active spots, since they improve on a different timeline.</li>
+        <li><b>Photos in the same light and angle.</b> Without that, changes are mostly lighting.</li>
+        <li><b>Routine consistency</b> and the start date of every product.</li>
+        <li><b>Triggers, with a lag.</b> Sleep, stress, diet and picking in the 1–3 days before a scan.</li>
+        <li><b>Hormonal pattern.</b> Spots on the chin and jaw that flare before a period suggest a hormonal component a doctor can treat.</li>
+      </ul>
+    </div></details>
+
+    <details class="learn"><summary>When to see a dermatologist</summary><div class="body">
+      <ul class="plain"><li>Painful deep lumps (nodules or cysts)</li><li>Any scarring, or dark marks that keep appearing</li><li>No improvement after 12 weeks of consistent over-the-counter treatment</li><li>Sudden acne in adulthood, or with irregular periods or extra hair growth</li><li>It's affecting your mood or confidence. Prescription options (topical retinoids, antibiotics, spironolactone, isotretinoin) work very well.</li></ul>
+    </div></details>
+
+    <div class="card"><span class="label">Sources</span><ul class="plain tiny">
+      <li><a href="https://pubmed.ncbi.nlm.nih.gov/34163203/" target="_blank" rel="noopener">Skin Quality: A Holistic 360° View, consensus results</a></li>
+      <li><a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC6990806" target="_blank" rel="noopener">Acne severity assessment: lesion counting vs global grading</a></li>
+      <li><a href="https://pubmed.ncbi.nlm.nih.gov/35373155/" target="_blank" rel="noopener">Diet and acne: a systematic review (2022)</a></li>
+      <li><a href="https://www.aad.org/diet" target="_blank" rel="noopener">American Academy of Dermatology: can the right diet get rid of acne?</a></li>
+      <li><a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC11022506/" target="_blank" rel="noopener">Whey protein supplements and acne (2024 case-control study)</a></li>
+      <li><a href="https://hexi.ox.ac.uk/acne/acne-diet-and-sleep" target="_blank" rel="noopener">University of Oxford HEXI: acne, diet and sleep</a></li>
+    </ul></div>
+  </section>
+
+  <p class="disclaimer">Clearday gives cosmetic estimates from photos, not a diagnosis. For painful lumps, scarring, or acne that isn't improving after 12 weeks of treatment, see a dermatologist.</p>
+</div>
+
+<div class="sheet" id="sheet" hidden role="dialog" aria-modal="true" aria-labelledby="sheetTitle">
+  <div class="wrap">
+    <div class="row between"><h2 id="sheetTitle">Skin report</h2><button id="sheetClose">Close</button></div>
+    <div id="sheetBody" class="stack" style="gap:16px"></div>
+  </div>
 </div>
 
 <nav class="tabs" aria-label="Sections"><div class="in">
-  <a href="#scan" data-v="scan"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2"/><circle cx="12" cy="12" r="3.5"/></svg>Scan</a>
+  <a href="#today" data-v="today"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2"/><circle cx="12" cy="12" r="3.5"/></svg>Today</a>
   <a href="#progress" data-v="progress"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 19h16M5 15l4-5 4 3 6-7"/></svg>Progress</a>
-  <a href="#history" data-v="history"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/></svg>History</a>
+  <a href="#routine" data-v="routine"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="8" y="3" width="8" height="5" rx="1"/><path d="M7 8h10l1 13H6z"/></svg>Routine</a>
+  <a href="#learn" data-v="learn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 5.5C6.5 4 9.5 4 12 6c2.5-2 5.5-2 8-.5V19c-2.5-1.5-5.5-1.5-8 .5-2.5-2-5.5-2-8-.5z"/><path d="M12 6v13.5"/></svg>Learn</a>
 </div></nav>
 
 <script>
@@ -285,58 +455,66 @@ nav.tabs svg { width: 24px; height: 24px }
 "use strict";
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const num = (v, d = 0) => (Number.isFinite(Number(v)) ? Number(v) : d);
 
-const FACTORS = [
-  ["sleep", "Slept 7h+"], ["water", "Lots of water"], ["stress", "Stressed"], ["period", "Period"],
-  ["dairy", "Dairy"], ["sugar", "Sugary food"], ["workout", "Workout"], ["picked", "Picked skin"],
-  ["newproduct", "New product"], ["makeup", "Wore makeup"], ["sun", "Sun exposure"], ["meds", "Took acne meds"],
+/* ---------- vocab ---------- */
+const LESIONS = [["blackheads", "Black-heads", "c"], ["whiteheads", "White-heads", "c"], ["papules", "Red bumps", "i"], ["pustules", "Pus spots", "i"], ["nodules", "Deep / cysts", "i"]];
+const METRICS = [
+  ["clarity", "Clarity"], ["calm", "Calmness"], ["tone", "Even tone"], ["texture", "Smoothness"],
+  ["pores", "Pores"], ["oil", "Oil balance"], ["hydration", "Hydration"], ["glow", "Glow"], ["undereye", "Under-eyes"],
 ];
-const LESIONS = [["whiteheads", "White-heads"], ["blackheads", "Black-heads"], ["papules", "Red bumps"], ["pustules", "Pus spots"], ["nodules", "Deep / cysts"]];
 const ZONES = [["forehead", "Forehead"], ["nose", "Nose"], ["leftCheek", "Left cheek"], ["rightCheek", "Right cheek"], ["chin", "Chin"], ["jaw", "Jawline"]];
-const GRADES = ["Clear", "Almost clear", "Mild", "Moderate", "Severe"]; // IGA 0–4
+const ZONE_HINT = { forehead: "Hair products, fringes, hats", nose: "Oil and blackheads", leftCheek: "Phone, pillowcase, touching", rightCheek: "Phone, pillowcase, touching", chin: "Often hormonal", jaw: "Often hormonal, shaving" };
+const GRADES = ["Clear", "Almost clear", "Mild", "Moderate", "Severe"];
+const FEEL = [["oily", "Oily"], ["dry", "Dry / tight"], ["itchy", "Itchy"], ["sting", "Stinging"], ["sore", "Sore spots"], ["calm", "Calm"]];
+const FOOD = [["sugar", "Sugary / refined carbs"], ["milk", "Milk"], ["whey", "Whey protein"], ["fast", "Fast food"], ["alcohol", "Alcohol"], ["veg", "Lots of veg"]];
+const HABIT = [["picked", "Picked / popped"], ["touch", "Touched face a lot"], ["workout", "Workout"], ["noshower", "Didn't wash after sweating"], ["pillow", "Fresh pillowcase"], ["sun", "Sun without SPF"], ["makeupbed", "Slept in makeup"], ["period", "Period"], ["newprod", "Started new product"]];
+const BAD = new Set(["sugar", "milk", "whey", "fast", "alcohol", "picked", "touch", "noshower", "sun", "makeupbed", "itchy", "sting", "sore"]);
+const KINDS = ["Cleanser", "Treatment", "Moisturizer", "Sunscreen", "Exfoliant", "Spot treatment", "Other"];
+const ACTIVES = [["none", "No active ingredient"], ["adapalene", "Adapalene"], ["tretinoin", "Tretinoin / prescription retinoid"], ["retinol", "Retinol"], ["bp", "Benzoyl peroxide"], ["sa", "Salicylic acid (BHA)"], ["aha", "Glycolic / lactic acid (AHA)"], ["azelaic", "Azelaic acid"], ["niacinamide", "Niacinamide"], ["clinda", "Clindamycin / topical antibiotic"], ["other", "Other active"]];
+const ACT_NAME = Object.fromEntries(ACTIVES);
+const TIMELINE = { adapalene: [12, "Purging in weeks 2–6 is normal. Judge it at week 12."], tretinoin: [12, "Irritation settles by weeks 4–6. Judge it at week 12."], retinol: [12, "Gentler and slower than adapalene."], bp: [8, "Inflamed spots usually calm within 4–8 weeks."], sa: [8, "Blackheads improve over 6–8 weeks."], aha: [8, "Texture improves over 6–8 weeks."], azelaic: [12, "Redness and marks fade over 8–16 weeks."], niacinamide: [8, "Redness and oil improve within 4–8 weeks."], clinda: [12, "Pair with benzoyl peroxide to prevent resistance. Limit to about 12 weeks."] };
 
-/* ---------------- storage ---------------- */
-let scans = [];           // newest first
-let store = null;         // {kind, save(scan), remove(id)}
-const LS_KEY = "clearday.scans.v1";
+/* ---------- state + storage ---------- */
+let docs = {};            // id -> body
+let store = null;
+const LS_KEY = "clearday.v2";
+const scans = () => Object.entries(docs).filter(([, d]) => d.type === "scan" || (!d.type && d.photo)).map(([id, d]) => ({ ...d, id })).sort((a, b) => (b.at > a.at ? 1 : -1));
+const days = () => Object.entries(docs).filter(([, d]) => d.type === "day").map(([id, d]) => ({ ...d, id }));
+const routine = () => docs.routine && docs.routine.type === "routine" ? docs.routine : { type: "routine", am: [], pm: [] };
+const dayKey = (d) => d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+const todayKey = () => dayKey(new Date());
 
-function lsLoad() { try { return JSON.parse(localStorage.getItem(LS_KEY) || "[]"); } catch { return []; } }
-function lsSave(list) { try { localStorage.setItem(LS_KEY, JSON.stringify(list)); return true; } catch { return false; } }
-function setScans(list) { scans = list.slice().sort((a, b) => (b.at > a.at ? 1 : -1)); renderAll(); }
-
-function useLocal(reason) {
+function lsLoad() { try { return JSON.parse(localStorage.getItem(LS_KEY) || "{}"); } catch { return {}; } }
+function lsWrite(m) { try { localStorage.setItem(LS_KEY, JSON.stringify(m)); return true; } catch { return false; } }
+function useLocal() {
   store = {
-    kind: "local",
-    async save(s) { const l = lsLoad().filter((x) => x.id !== s.id); l.push(s); if (!lsSave(l)) throw new Error("This device's storage is full. Delete old scans and try again."); setScans(l); },
-    async remove(id) { const l = lsLoad().filter((x) => x.id !== id); lsSave(l); setScans(l); },
+    async set(id, body) { const m = lsLoad(); m[id] = body; if (!lsWrite(m)) throw new Error("This device's storage is full. Delete old scans and try again."); docs = m; renderAll(); },
+    async remove(id) { const m = lsLoad(); delete m[id]; lsWrite(m); docs = m; renderAll(); },
   };
-  $("storeStatus").textContent = reason || "Saved on this device";
-  setScans(lsLoad());
+  $("storeStatus").textContent = "Saved on this device";
+  docs = lsLoad(); renderAll();
 }
-
 async function initStore() {
-  const use = window.claude && window.claude.use;
-  if (!use) return useLocal("Saved on this device");
+  if (!(window.claude && window.claude.use)) return useLocal();
   try {
     const [db, user] = await Promise.all([window.claude.use("db"), window.claude.use("user")]);
     const uid = user ? await user.id() : null;
-    if (!db || !uid) return useLocal("Saved on this device");
+    if (!db || !uid) return useLocal();
     const col = db.collection("data/users/" + uid);
     $("storeStatus").textContent = "Syncing…";
-    const timer = setTimeout(() => { $("storeStatus").textContent = "Can't reach your saved scans yet"; }, 10000);
+    const timer = setTimeout(() => { $("storeStatus").textContent = "Can't reach saved data yet"; }, 10000);
     col.onSnapshot((snap) => {
       if (!snap.metadata.fromCache) { clearTimeout(timer); $("storeStatus").textContent = "Private · synced"; }
-      setScans(snap.docs.filter((d) => d.exists).map((d) => ({ ...d.data(), id: d.id })));
-    }, (err) => { clearTimeout(timer); $("storeStatus").textContent = "Sync stopped: " + (err && err.message || "error"); });
-    store = {
-      kind: "db",
-      async save(s) { const { id, ...body } = s; await col.doc(id).set(body); },
-      async remove(id) { await col.doc(id).delete(); },
-    };
-  } catch (e) { useLocal("Saved on this device"); }
+      const m = {}; for (const d of snap.docs) if (d.exists) m[d.id] = d.data();
+      docs = m; renderAll();
+    }, (err) => { clearTimeout(timer); $("storeStatus").textContent = "Sync stopped"; });
+    store = { async set(id, body) { await col.doc(id).set(body); }, async remove(id) { await col.doc(id).delete(); } };
+  } catch { useLocal(); }
 }
 
-/* ---------------- sample (Claude vision) ---------------- */
+/* ---------- Claude ---------- */
 let samplePromise = null;
 function getSample() {
   if (!samplePromise) samplePromise = (async () => {
@@ -344,265 +522,201 @@ function getSample() {
     const s = await window.claude.use("sample");
     if (!s) return null;
     const lim = await s.limits().catch(() => null);
-    return lim && lim.images ? s : null;
+    return { s, maxImages: lim && lim.images ? lim.images.maxCount : 0 };
   })().catch(() => null);
   return samplePromise;
 }
 
-/* ---------------- image handling ---------------- */
-let current = null; // {blob, thumb, local, ai, w, h}
-
+/* ---------- photos ---------- */
+const shots = { front: null, left: null, right: null }; // {blob, thumb, url}
 async function loadImage(file) {
   const url = URL.createObjectURL(file);
-  try {
-    const img = new Image();
-    img.decoding = "async";
-    img.src = url;
-    await img.decode();
-    return img;
-  } finally { setTimeout(() => URL.revokeObjectURL(url), 2000); }
+  const img = new Image(); img.src = url; await img.decode(); return { img, url };
 }
-
-// crop to 4:5 portrait, centered, then scale so the longest side is `max`
 function cropCanvas(img, max) {
   const iw = img.naturalWidth, ih = img.naturalHeight, ratio = 4 / 5;
-  let sw = iw, sh = iw / ratio;
-  if (sh > ih) { sh = ih; sw = ih * ratio; }
-  const sx = (iw - sw) / 2, sy = (ih - sh) / 2;
+  let sw = iw, sh = iw / ratio; if (sh > ih) { sh = ih; sw = ih * ratio; }
   const h = Math.min(max, Math.round(sh)), w = Math.round(h * ratio);
   const c = document.createElement("canvas"); c.width = w; c.height = h;
-  c.getContext("2d").drawImage(img, sx, sy, sw, sh, 0, 0, w, h);
+  c.getContext("2d").drawImage(img, (iw - sw) / 2, (ih - sh) / 2, sw, sh, 0, 0, w, h);
   return c;
 }
 const toBlob = (c, q) => new Promise((r) => c.toBlob(r, "image/jpeg", q));
-const toDataURL = (c, q) => c.toDataURL("image/jpeg", q);
-
-/* Local skin measurement: Lab a* (red–green) inside the face oval.
-   Spots = small patches noticeably redder than the skin around them. */
-function analyzeLocal(srcCanvas) {
-  const W = 200, H = 250;
-  const c = document.createElement("canvas"); c.width = W; c.height = H;
-  const ctx = c.getContext("2d", { willReadFrequently: true });
-  ctx.drawImage(srcCanvas, 0, 0, W, H);
-  const px = ctx.getImageData(0, 0, W, H).data;
-  const A = new Float32Array(W * H), L = new Float32Array(W * H), mask = new Uint8Array(W * H);
-  const cx = W / 2, cy = H * 0.47, rx = W * 0.33, ry = H * 0.40;
-  const lin = (v) => { v /= 255; return v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); };
-  const f = (t) => (t > 0.008856 ? Math.cbrt(t) : 7.787 * t + 16 / 116);
-  const skinA = [];
-  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
-    const i = y * W + x, p = i * 4;
-    const r = lin(px[p]), g = lin(px[p + 1]), b = lin(px[p + 2]);
-    const X = (r * 0.4124 + g * 0.3576 + b * 0.1805) / 0.95047, Y = r * 0.2126 + g * 0.7152 + b * 0.0722, Z = (r * 0.0193 + g * 0.1192 + b * 0.9505) / 1.08883;
-    const fy = f(Y);
-    L[i] = 116 * fy - 16; A[i] = 500 * (f(X) - fy);
-    const inOval = ((x - cx) / rx) ** 2 + ((y - cy) / ry) ** 2 <= 1;
-    // skip eyes/brows band roughly and non-skin tones
-    const eyeBand = y > H * 0.30 && y < H * 0.42 && Math.abs(x - cx) > W * 0.05;
-    const mouth = y > H * 0.66 && y < H * 0.75 && Math.abs(x - cx) < W * 0.13;
-    if (inOval && !eyeBand && !mouth && L[i] > 22 && L[i] < 96 && A[i] > -2) { mask[i] = 1; skinA.push(A[i]); }
+for (const k of ["front", "left", "right"]) {
+  $("in-" + k).addEventListener("change", async (e) => {
+    const f = e.target.files[0]; e.target.value = ""; if (!f) return;
+    try {
+      const { img, url } = await loadImage(f);
+      const send = cropCanvas(img, 1100);
+      const thumb = cropCanvas(img, k === "front" ? 640 : 380);
+      shots[k] = { blob: await toBlob(send, 0.88), thumb: thumb.toDataURL("image/jpeg", k === "front" ? 0.74 : 0.66) };
+      URL.revokeObjectURL(url);
+      renderShots();
+    } catch { toast("Couldn't read that photo. Try a JPEG or PNG."); }
+  });
+}
+function renderShots() {
+  for (const k of ["front", "left", "right"]) {
+    const el = $("shot-" + k), s = shots[k];
+    el.classList.toggle("filled", !!s);
+    let im = el.querySelector("img"), bd = el.querySelector(".badge");
+    if (s) {
+      if (!im) { im = document.createElement("img"); im.alt = k + " photo"; el.prepend(im); }
+      im.src = s.thumb;
+      if (!bd) { bd = document.createElement("span"); bd.className = "badge"; el.appendChild(bd); }
+      bd.textContent = "Retake";
+      el.querySelector(".cap").hidden = true;
+    } else { im && im.remove(); bd && bd.remove(); el.querySelector(".cap").hidden = false; }
   }
-  if (skinA.length < 500) return { ok: false };
-  skinA.sort((a, b) => a - b);
-  const med = skinA[skinA.length >> 1];
-  const mad = skinA.map((v) => Math.abs(v - med)).sort((a, b) => a - b)[skinA.length >> 1] || 1;
-  const thrRed = med + Math.max(6, 2.5 * mad);
-  let redPx = 0; for (const v of skinA) if (v > thrRed) redPx++;
-  const redPct = (100 * redPx) / skinA.length;
-
-  // local contrast in a*: subtract box blur (radius 7) using integral image
-  const R = 7, S = new Float64Array((W + 1) * (H + 1)), M = new Float64Array((W + 1) * (H + 1));
-  for (let y = 0; y < H; y++) { let rs = 0, rm = 0; for (let x = 0; x < W; x++) { const i = y * W + x; rs += mask[i] ? A[i] : 0; rm += mask[i]; S[(y + 1) * (W + 1) + x + 1] = S[y * (W + 1) + x + 1] + rs; M[(y + 1) * (W + 1) + x + 1] = M[y * (W + 1) + x + 1] + rm; } }
-  const box = (T, x0, y0, x1, y1) => T[y1 * (W + 1) + x1] - T[y0 * (W + 1) + x1] - T[y1 * (W + 1) + x0] + T[y0 * (W + 1) + x0];
-  const hot = new Uint8Array(W * H);
-  const dThr = Math.max(4.5, 2 * mad);
-  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
-    const i = y * W + x; if (!mask[i]) continue;
-    const x0 = Math.max(0, x - R), y0 = Math.max(0, y - R), x1 = Math.min(W, x + R + 1), y1 = Math.min(H, y + R + 1);
-    const n = box(M, x0, y0, x1, y1); if (n < 20) continue;
-    if (A[i] - box(S, x0, y0, x1, y1) / n > dThr) hot[i] = 1;
-  }
-  // connected components
-  const seen = new Uint8Array(W * H), spots = [];
-  for (let i = 0; i < W * H; i++) {
-    if (!hot[i] || seen[i]) continue;
-    const q = [i]; seen[i] = 1; let n = 0, sx = 0, sy = 0;
-    while (q.length) { const j = q.pop(); n++; const x = j % W, y = (j / W) | 0; sx += x; sy += y;
-      for (const k of [j - 1, j + 1, j - W, j + W]) if (k >= 0 && k < W * H && hot[k] && !seen[k] && Math.abs((k % W) - x) <= 1) { seen[k] = 1; q.push(k); } }
-    if (n >= 3 && n <= 90) spots.push({ x: sx / n / W, y: sy / n / H, r: Math.sqrt(n / Math.PI) / W });
-  }
-  return { ok: true, spots: spots.slice(0, 80), spotCount: Math.min(spots.length, 80), redPct: Math.round(redPct * 10) / 10 };
+  const n = ["front", "left", "right"].filter((k) => shots[k]).length;
+  $("analyzeBtn").disabled = !shots.front || busy;
+  $("clearShots").hidden = n === 0 || busy;
+  $("scanHint").textContent = !shots.front ? "Add a front photo to start. The analysis takes about 30 seconds." : n === 1 ? "Ready. Side photos are optional but give a better read of cheeks and jawline." : "Ready with " + n + " photos.";
 }
+$("clearShots").addEventListener("click", () => { shots.front = shots.left = shots.right = null; renderShots(); $("scanError").hidden = true; });
 
-function drawMarks(local, showing) {
-  const mc = $("markCanvas"), pc = $("photoCanvas");
-  mc.width = pc.width; mc.height = pc.height;
-  const ctx = mc.getContext("2d"); ctx.clearRect(0, 0, mc.width, mc.height);
-  if (!local || !local.ok || !showing) return;
-  ctx.lineWidth = Math.max(2, mc.width / 220);
-  ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue("--flare").trim() || "#d9534f";
-  for (const s of local.spots) {
-    ctx.beginPath(); ctx.arc(s.x * mc.width, s.y * mc.height, Math.max(mc.width * 0.018, s.r * mc.width * 1.8), 0, Math.PI * 2); ctx.stroke();
-  }
+/* ---------- analysis ---------- */
+let busy = false;
+const STEPS = ["Checking photo quality", "Counting spots by type", "Reading redness, marks and texture", "Mapping zones", "Writing your routine"];
+function showSteps(i) {
+  const box = $("steps"); box.hidden = i < 0;
+  box.innerHTML = STEPS.map((s, j) => `<div class="${j < i ? "done" : j === i ? "on" : ""}"><span class="dot">${j < i ? "✓" : ""}</span>${esc(s)}</div>`).join("");
 }
-
-async function onFile(file) {
-  if (!file) return;
-  try {
-    const img = await loadImage(file);
-    const big = cropCanvas(img, 960);
-    const pc = $("photoCanvas"); pc.width = big.width; pc.height = big.height; pc.getContext("2d").drawImage(big, 0, 0);
-    pc.hidden = false; $("markCanvas").hidden = false; $("frameEmpty").hidden = true;
-    const send = cropCanvas(img, 900);
-    const thumbC = cropCanvas(img, 600);
-    current = { blob: await toBlob(send, 0.86), thumb: toDataURL(thumbC, 0.72), local: analyzeLocal(big), ai: null, factors: new Set() };
-    drawMarks(current.local, true);
-    $("camLabel").textContent = "Retake";
-    $("resultCard").hidden = false; $("logCard").hidden = false;
-    $("products").value = (scans[0] && scans[0].products) || "";
-    $("note").value = "";
-    renderChips();
-    renderLocal(); renderAI();
-    const s = await getSample();
-    $("analyzeBtn").hidden = !s;
-    $("aiNote").textContent = s ? "Claude looks at the photo and counts each type of blemish. It takes about 15 seconds." : "Detailed analysis needs Claude, which isn't available in this view. Spot and redness estimates above still save.";
-    $("resultCard").scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
-  } catch (e) { toast("Couldn't read that photo. Try a JPEG or PNG."); }
+function contextForPrompt() {
+  const prev = scans().find((s) => s.report && !s.report.notFace);
+  const r = routine();
+  const fmtSteps = (l) => l.map((x) => `${x.name} (${x.kind}${x.active && x.active !== "none" ? ", " + ACT_NAME[x.active] : ""}${x.started ? ", since " + x.started : ""})`).join("; ") || "none listed";
+  const recent = days().filter((d) => d.id >= "day_" + dayKey(new Date(Date.now() - 7 * 864e5))).sort((a, b) => (a.id > b.id ? 1 : -1));
+  const ci = recent.map((d) => `${d.id.slice(4)}: sleep ${d.sleep ?? "?"}h, stress ${d.stress ?? "?"}/5, water ${d.water ?? "?"}, new spots ${d.newspots ?? "?"}, tags [${[...(d.feel || []), ...(d.food || []), ...(d.habit || [])].join(", ")}], routine ${adherence(d) === null ? "?" : Math.round(adherence(d) * 100) + "%"}${d.note ? ", note: " + String(d.note).slice(0, 120) : ""}`).join("\n");
+  return `CONTEXT FROM THE USER'S JOURNAL
+Morning routine: ${fmtSteps(r.am)}
+Evening routine: ${fmtSteps(r.pm)}
+Last 7 days of check-ins:
+${ci || "none yet"}
+${prev ? `Previous scan (${prev.at.slice(0, 10)}): skinScore ${prev.report.skinScore}, IGA ${prev.report.iga}, counts ${JSON.stringify(prev.report.counts)}, metrics ${JSON.stringify(prev.report.metrics)}.` : "This is their first scan."}`;
 }
-$("camInput").addEventListener("change", (e) => { onFile(e.target.files[0]); e.target.value = ""; });
-$("fileInput").addEventListener("change", (e) => { onFile(e.target.files[0]); e.target.value = ""; });
+function buildPrompt(labels) {
+  return `You are the skin-analysis engine of an acne progress-tracking app. The user photographed their own face to track their acne. Images attached, in order: ${labels.join(", ")}. Examine them closely, zooming mentally into every area, like an experienced dermatologist doing a careful visual assessment. Be specific and honest; do not be vague, flattering, or generic. If you see something, name it and say where it is.
 
-function renderLocal() {
-  const l = current && current.local, box = $("localResult");
-  if (!l || !l.ok) { box.innerHTML = `<p class="notice">Couldn't find enough skin inside the oval. Retake with your face filling the guide and even light.</p>`; return; }
-  const prev = scans.find((s) => s.local && s.local.ok);
-  const delta = prev ? l.spotCount - prev.local.spotCount : null;
-  box.innerHTML = `
-    <div class="row" style="justify-content:space-between;align-items:flex-start">
-      <div class="stack" style="gap:2px"><span class="label">Red spots found</span><b class="num" style="font-size:1.6rem">${l.spotCount}</b>
-        ${delta === null ? "" : `<span class="pill ${delta < 0 ? "good" : delta > 0 ? "bad" : ""}">${delta === 0 ? "Same as last scan" : (delta < 0 ? "▼ " : "▲ ") + Math.abs(delta) + " vs last scan"}</span>`}</div>
-      <div class="stack" style="gap:2px;text-align:right"><span class="label">Inflamed area</span><b class="num" style="font-size:1.6rem">${l.redPct}%</b><span class="small muted">of visible skin</span></div>
-    </div>
-    <p class="small muted">Circled on the photo. These quick estimates come from color alone, so lighting changes affect them.</p>`;
-}
+${contextForPrompt()}
 
-function iga(sev) { return GRADES[Math.max(0, Math.min(4, Math.round(sev / 2.5)))]; }
-function dialSVG(sev) {
-  const pct = Math.max(0, Math.min(10, sev)) / 10, r = 30, C = 2 * Math.PI * r;
-  const col = sev <= 2.5 ? "var(--accent)" : sev <= 5.5 ? "var(--warn)" : "var(--flare)";
-  return `<svg class="dial" viewBox="0 0 74 74" role="img" aria-label="Severity ${sev} of 10"><circle cx="37" cy="37" r="${r}" fill="none" stroke="var(--sunk)" stroke-width="8"/><circle cx="37" cy="37" r="${r}" fill="none" stroke="${col}" stroke-width="8" stroke-linecap="round" stroke-dasharray="${C * pct} ${C}" transform="rotate(-90 37 37)"/><text x="37" y="42" text-anchor="middle" fill="var(--ink)" style="font:600 17px var(--font-mono)">${esc(sev)}</text></svg>`;
-}
-
-function aiBlock(ai) {
-  const sev = Math.round(Number(ai.severity) * 10) / 10;
-  const counts = LESIONS.map(([k, lab]) => `<div><b>${esc(Number(ai.counts?.[k]) || 0)}</b><span>${lab}</span></div>`).join("");
-  return `
-    <div class="grade">${dialSVG(sev)}
-      <div class="stack" style="gap:4px"><span class="label">Severity</span><h3 style="font-size:1.2rem;font-weight:700">${esc(iga(sev))}</h3>
-      <p class="small muted">${esc(ai.summary || "")}</p></div></div>
-    <div class="counts">${counts}</div>
-    <div class="split"><div>${faceSVG(ai.zones || {})}</div>
-      <div class="stack small">${ZONES.map(([k, lab]) => `<div class="row" style="justify-content:space-between"><span>${lab}</span><span class="muted">${["none", "light", "some", "lots"][Math.max(0, Math.min(3, Number(ai.zones?.[k]) || 0))]}</span></div>`).join("")}
-      ${Number(ai.marks) > 0 ? `<div class="row" style="justify-content:space-between"><span>Dark marks / scars</span><span class="muted">${["none", "light", "some", "lots"][Math.min(3, Number(ai.marks))]}</span></div>` : ""}</div></div>
-    ${Array.isArray(ai.tips) && ai.tips.length ? `<div class="stack" style="gap:6px"><span class="label">Try this</span><ul class="plain small">${ai.tips.slice(0, 4).map((t) => `<li>${esc(t)}</li>`).join("")}</ul></div>` : ""}
-    ${ai.seeDerm ? `<p class="notice">This scan shows signs (deep or cystic spots, or possible scarring) that a dermatologist can treat best. Prescription options work well for these.</p>` : ""}`;
-}
-
-function renderAI() {
-  const box = $("aiResult");
-  if (!current || !current.ai) { box.innerHTML = ""; return; }
-  if (current.ai.notFace) { box.innerHTML = `<p class="notice">${esc(current.ai.summary || "Claude couldn't see a face clearly. Retake facing the camera in good light.")}</p>`; return; }
-  box.innerHTML = aiBlock(current.ai);
-}
-
-let analyzing = null;
-$("analyzeBtn").addEventListener("click", async () => {
-  if (!current || analyzing) return;
-  const s = await getSample(); if (!s) return;
-  const btn = $("analyzeBtn"); btn.disabled = true; btn.innerHTML = `<span class="spinner"></span> Analyzing`;
-  const prev = scans.find((x) => x.ai && !x.ai.notFace);
-  const prompt = `You are assisting a skincare progress-tracking app. The attached image is a selfie the user took to track their own acne over time. Assess the visible acne as a careful, conservative cosmetic observer (not a diagnosis).
-
-Return ONLY a JSON object with exactly these keys:
+Return ONLY one JSON object with exactly these keys:
 {
  "notFace": boolean (true if no human face is clearly visible),
- "severity": number 0-10 with one decimal (0 = completely clear, 2.5 = almost clear, 5 = mild-moderate, 7.5 = moderate-severe, 10 = severe; keep it consistent with the IGA scale),
- "counts": {"whiteheads": int, "blackheads": int, "papules": int, "pustules": int, "nodules": int} (visible lesions you can actually see; estimate when many),
- "zones": {"forehead": 0-3, "nose": 0-3, "leftCheek": 0-3, "rightCheek": 0-3, "chin": 0-3, "jaw": 0-3} (0 none, 1 light, 2 some, 3 lots; left/right are the person's own left/right),
- "marks": 0-3 (post-acne dark marks or scarring),
- "summary": string, one or two plain sentences describing what you see,
- "tips": array of 2-3 short, practical, evidence-based skincare suggestions tailored to what you see (e.g. ingredient + how to use). No brand names,
- "seeDerm": boolean (true if nodules/cysts, scarring, or severity >= 7)
+ "photoQuality": {"score": 0-100, "issues": [short strings, e.g. "Warm indoor light hides redness", "Slightly blurry"]},
+ "skinScore": 0-100 overall skin health (100 = clear, calm, even, smooth; weight active acne most heavily),
+ "iga": 0-4 (Investigator's Global Assessment: 0 clear, 1 almost clear, 2 mild, 3 moderate, 4 severe),
+ "acneType": one of "clear", "comedonal", "inflammatory", "mixed", "hormonal pattern", "nodulocystic",
+ "skinType": one of "oily", "combination", "normal", "dry", "sensitive",
+ "counts": {"blackheads": int, "whiteheads": int, "papules": int, "pustules": int, "nodules": int} (count what you can see across all photos without double-counting; estimate when many),
+ "marks": {"red": 0-3, "brown": 0-3, "note": short string} (post-inflammatory erythema / hyperpigmentation),
+ "scarring": {"level": 0-3, "types": [any of "icepick","boxcar","rolling","hypertrophic"], "note": short string},
+ "metrics": {"clarity","calm","tone","texture","pores","oil","hydration","glow","undereye"} each 0-100, higher is always better (oil 100 = balanced, not shiny or dry; undereye 100 = no dark circles/puffiness),
+ "metricNotes": same 9 keys, each a specific one-sentence observation about THIS face (location, what you see),
+ "zones": {"forehead","nose","leftCheek","rightCheek","chin","jaw"} each {"level": 0-3, "note": what is there, e.g. "4 closed comedones above left brow"} (left/right = the person's own left/right),
+ "headline": one punchy sentence summarising today's skin,
+ "summary": 2-3 sentences: overall state, the main issue, and how it compares to the previous scan if there is one,
+ "strengths": 1-3 short strings (what is going well),
+ "concerns": 1-4 objects {"title": short, "detail": one or two sentences with the likely cause, "priority": "high"|"medium"|"low"},
+ "likelyTriggers": 0-3 short strings, based on the zone pattern AND their check-in data (say which data point supports it); empty if none apparent,
+ "routine": {"am": 3-4 objects {"step": e.g. "Cleanse", "ingredient": generic ingredient + strength, "why": short}, "pm": 3-4 such objects, "avoid": 1-3 short strings} (build on their current routine; flag any clash; no brand names),
+ "changes": one sentence comparing with the previous scan, or "" if first scan,
+ "nextFocus": one sentence: the single most useful thing to do this week,
+ "seeDerm": boolean (true if nodules/cysts, scarring, IGA >= 3, or no improvement despite 12+ weeks of treatment),
+ "seeDermWhy": short string or ""
 }
-${prev ? `For consistency, their previous scan was rated severity ${prev.ai.severity} with counts ${JSON.stringify(prev.ai.counts)}. Rate this photo on its own merits but on the same scale.` : ""}
-If lighting or blur limits what you can see, say so in the summary.`;
-  analyzing = new AbortController();
+If photo quality limits the assessment, still give your best estimate and list the issue.`;
+}
+
+$("analyzeBtn").addEventListener("click", async () => {
+  if (!shots.front || busy) return;
+  const err = $("scanError"); err.hidden = true;
+  const sm = await getSample();
+  if (!sm || !sm.maxImages) {
+    err.hidden = false;
+    err.innerHTML = `<p class="notice">Skin analysis needs Claude, and this view can't reach it. Open Clearday on claude.ai while signed in. Your photo is still here.</p><button class="sm" id="savePhotoOnly">Save photo without analysis</button>`;
+    $("savePhotoOnly").onclick = () => saveScan(null);
+    return;
+  }
+  busy = true; renderShots();
+  const order = ["front", "left", "right"].filter((k) => shots[k]).slice(0, Math.max(1, sm.maxImages));
+  const labels = order.map((k) => ({ front: "front view", left: "the person's left side (profile)", right: "the person's right side (profile)" }[k]));
+  let i = 0; showSteps(0);
+  const tick = setInterval(() => { if (i < STEPS.length - 1) showSteps(++i); }, 6000);
+  const btn = $("analyzeBtn"); btn.textContent = "Analyzing…";
   try {
-    const ai = await s.json(prompt, { images: current.blob, modelTier: "default", signal: analyzing.signal });
-    if (!ai || typeof ai !== "object") throw { code: "invalid_json" };
-    ai.severity = Math.max(0, Math.min(10, Number(ai.severity) || 0));
-    current.ai = ai; renderAI();
-    $("aiNote").textContent = "";
-    btn.textContent = "Re-analyze";
+    const report = await sm.s.json(buildPrompt(labels), { images: order.map((k) => shots[k].blob), modelTier: "complex" });
+    if (!report || typeof report !== "object") throw { code: "invalid_json" };
+    clearInterval(tick); showSteps(STEPS.length);
+    if (report.notFace) { err.hidden = false; err.innerHTML = `<p class="notice">Claude couldn't see a face clearly in the front photo. Retake it facing the camera in good light.</p>`; return; }
+    normalize(report);
+    await saveScan(report);
   } catch (e) {
+    clearInterval(tick);
     const code = e && e.code;
-    $("aiNote").textContent = code === "not_granted" ? "Claude analysis is turned off for this page. You can still save the spot estimate." :
-      code === "rate_limited" ? "You've hit a usage limit. Wait a bit, then try again." :
-      code === "image_rejected" ? "That photo couldn't be sent. Try retaking it." :
-      "Analysis didn't finish. Try again in a moment.";
-    if (code === "not_granted") btn.hidden = true;
-    btn.textContent = "Analyze with Claude";
-  } finally { btn.disabled = false; analyzing = null; }
+    err.hidden = false;
+    err.innerHTML = `<p class="notice">${esc(
+      code === "not_granted" ? "Claude analysis was declined for this page. Allow it from the page's permissions menu to get a skin report." :
+      code === "rate_limited" ? "You've reached a usage limit. Wait a little, then tap Analyze again." :
+      code === "image_rejected" || code === "images_unavailable" ? "Those photos couldn't be sent. Retake them as normal photos (not screenshots or Live Photos)." :
+      code === "refused" ? "Claude couldn't analyze these photos. Try a plain, well-lit front photo." :
+      "The analysis didn't finish. Tap Analyze to try again.")}</p>`;
+  } finally {
+    clearInterval(tick); busy = false; btn.textContent = "Analyze my skin"; showSteps(-1); renderShots();
+  }
 });
 
-function renderChips() {
-  const box = $("factorChips"); box.innerHTML = "";
-  for (const [k, lab] of FACTORS) {
-    const b = document.createElement("button"); b.type = "button"; b.className = "chip"; b.id = "chip-" + k;
-    b.textContent = lab; b.setAttribute("aria-pressed", current && current.factors.has(k) ? "true" : "false");
-    b.addEventListener("click", () => { const on = !current.factors.has(k); on ? current.factors.add(k) : current.factors.delete(k); b.setAttribute("aria-pressed", String(on)); });
-    box.appendChild(b);
+function normalize(r) {
+  r.skinScore = clamp(Math.round(num(r.skinScore, 50)), 0, 100);
+  r.iga = clamp(Math.round(num(r.iga, 2)), 0, 4);
+  r.counts = r.counts || {}; for (const [k] of LESIONS) r.counts[k] = clamp(Math.round(num(r.counts[k])), 0, 500);
+  r.metrics = r.metrics || {}; for (const [k] of METRICS) r.metrics[k] = clamp(Math.round(num(r.metrics[k], 50)), 0, 100);
+  r.metricNotes = r.metricNotes || {};
+  r.zones = r.zones || {}; for (const [k] of ZONES) { const z = r.zones[k]; r.zones[k] = typeof z === "object" && z ? { level: clamp(Math.round(num(z.level)), 0, 3), note: String(z.note || "") } : { level: clamp(Math.round(num(z)), 0, 3), note: "" }; }
+  r.marks = r.marks || {}; r.marks.red = clamp(Math.round(num(r.marks.red)), 0, 3); r.marks.brown = clamp(Math.round(num(r.marks.brown)), 0, 3);
+  r.scarring = r.scarring || {}; r.scarring.level = clamp(Math.round(num(r.scarring.level)), 0, 3); r.scarring.types = Array.isArray(r.scarring.types) ? r.scarring.types : [];
+  for (const k of ["strengths", "concerns", "likelyTriggers"]) if (!Array.isArray(r[k])) r[k] = [];
+  r.routine = r.routine || {}; for (const k of ["am", "pm", "avoid"]) if (!Array.isArray(r.routine[k])) r.routine[k] = [];
+  r.photoQuality = r.photoQuality || { score: 70, issues: [] }; if (!Array.isArray(r.photoQuality.issues)) r.photoQuality.issues = [];
+  return r;
+}
+const active = (r) => LESIONS.reduce((n, [k]) => n + num(r.counts?.[k]), 0);
+const inflamed = (r) => LESIONS.filter((l) => l[2] === "i").reduce((n, [k]) => n + num(r.counts?.[k]), 0);
+const comedones = (r) => LESIONS.filter((l) => l[2] === "c").reduce((n, [k]) => n + num(r.counts?.[k]), 0);
+
+async function saveScan(report) {
+  const now = new Date();
+  const id = "scan_" + now.getTime().toString(36);
+  const body = { type: "scan", at: now.toISOString(), day: dayKey(now), photo: shots.front.thumb, sides: { left: shots.left?.thumb || null, right: shots.right?.thumb || null }, report };
+  try {
+    await store.set(id, body);
+    shots.front = shots.left = shots.right = null; renderShots();
+    toast(report ? "Report saved to your journal" : "Photo saved");
+    if (report) openReport(id, body);
+  } catch (e) {
+    // too large? drop side photos and retry once
+    try { body.sides = { left: null, right: null }; await store.set(id, body); shots.front = shots.left = shots.right = null; renderShots(); if (report) openReport(id, body); }
+    catch (e2) { toast((e2 && e2.message) || "Couldn't save. Try again."); }
   }
 }
 
-function resetScan() {
-  current = null;
-  $("photoCanvas").hidden = true; $("markCanvas").hidden = true; $("frameEmpty").hidden = false;
-  $("resultCard").hidden = true; $("logCard").hidden = true; $("camLabel").textContent = "Take selfie";
-  $("analyzeBtn").textContent = "Analyze with Claude";
+/* ---------- report rendering ---------- */
+const scoreCol = (v) => (v >= 80 ? "var(--accent)" : v >= 60 ? "var(--warn)" : "var(--flare)");
+const levelWord = (l) => ["None", "Light", "Moderate", "Heavy"][clamp(num(l), 0, 3)];
+function ring(score, size = 104, label = "Skin score") {
+  const r = 42, C = 2 * Math.PI * r, p = clamp(score, 0, 100) / 100;
+  return `<svg class="ring" viewBox="0 0 104 104" style="width:${size}px;height:${size}px" role="img" aria-label="${label} ${score} of 100"><circle cx="52" cy="52" r="${r}" fill="none" stroke="var(--sunk)" stroke-width="10"/><circle cx="52" cy="52" r="${r}" fill="none" stroke="${scoreCol(score)}" stroke-width="10" stroke-linecap="round" stroke-dasharray="${(C * p).toFixed(1)} ${C.toFixed(1)}" transform="rotate(-90 52 52)"/><text x="52" y="56" text-anchor="middle" fill="var(--ink)" style="font:600 26px var(--font-mono)">${score}</text><text x="52" y="72" text-anchor="middle" fill="var(--muted)" style="font:600 9px var(--font-body);letter-spacing:.08em">/ 100</text></svg>`;
 }
-$("discardBtn").addEventListener("click", resetScan);
-$("saveBtn").addEventListener("click", async () => {
-  if (!current || !store) return;
-  const btn = $("saveBtn"); btn.disabled = true; btn.textContent = "Saving…";
-  const now = new Date();
-  const scan = {
-    id: "s" + now.getTime().toString(36) + Math.random().toString(36).slice(2, 6),
-    at: now.toISOString(), day: dayKey(now),
-    photo: current.thumb,
-    local: current.local && current.local.ok ? { ok: true, spotCount: current.local.spotCount, redPct: current.local.redPct } : { ok: false },
-    ai: current.ai && !current.ai.notFace ? current.ai : null,
-    factors: [...current.factors],
-    products: $("products").value.trim().slice(0, 300),
-    note: $("note").value.trim().slice(0, 1000),
-  };
-  try { await store.save(scan); resetScan(); toast("Scan saved"); location.hash = "#progress"; }
-  catch (e) { toast((e && e.message) || "Couldn't save. Try again."); }
-  finally { btn.disabled = false; btn.textContent = "Save scan"; }
-});
-
-/* ---------------- helpers ---------------- */
-function dayKey(d) { return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); }
-const fmtDate = (iso) => new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" });
-const fmtFull = (iso) => new Date(iso).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric", year: "numeric" });
-const lesionTotal = (s) => s.ai ? LESIONS.reduce((n, [k]) => n + (Number(s.ai.counts?.[k]) || 0), 0) : null;
-let toastT;
-function toast(msg) { let t = document.querySelector(".toast"); if (!t) { t = document.createElement("div"); t.className = "toast"; t.setAttribute("role", "status"); document.body.appendChild(t); } t.textContent = msg; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => (t.hidden = true), 2600); }
-
-function faceSVG(zones) {
-  const c = (k) => `var(--z${Math.max(0, Math.min(3, Number(zones[k]) || 0))})`;
-  // viewer-facing: person's left cheek appears on the right side of the image
-  return `<svg viewBox="0 0 140 170" width="100%" style="max-width:140px;display:block" role="img" aria-label="Face map of breakout areas">
+function metricRows(r, prev) {
+  return METRICS.map(([k, lab]) => {
+    const v = r.metrics[k], pv = prev?.metrics?.[k], d = pv === undefined ? null : v - pv;
+    const delta = d === null || Math.abs(d) < 3 ? "" : `<span class="delta" style="color:${d > 0 ? "var(--accent)" : "var(--flare)"}">${d > 0 ? "▲" : "▼"}${Math.abs(d)}</span>`;
+    return `<div class="metric"><span class="name">${lab}</span><span class="bar"><i style="width:${v}%;background:${scoreCol(v)}"></i></span><span class="val">${v} ${delta}</span>${r.metricNotes?.[k] ? `<span class="note">${esc(r.metricNotes[k])}</span>` : ""}</div>`;
+  }).join("");
+}
+function faceSVG(levels) {
+  const c = (k) => `var(--z${clamp(num(levels[k]), 0, 3)})`;
+  return `<svg viewBox="0 0 140 170" width="100%" style="max-width:140px;display:block" role="img" aria-label="Face map of breakout zones">
     <ellipse cx="70" cy="85" rx="58" ry="78" fill="var(--sunk)" stroke="var(--line)"/>
     <path d="M20 58 Q22 14 70 8 Q118 14 120 58 Q70 50 20 58Z" fill="${c("forehead")}"/>
     <path d="M60 64 L80 64 L84 108 Q70 114 56 108 Z" fill="${c("nose")}"/>
@@ -612,153 +726,388 @@ function faceSVG(zones) {
     <path d="M116 118 Q106 128 90 126 L88 146 Q106 140 116 118Z" fill="${c("jaw")}"/>
     <path d="M54 130 Q70 136 86 130 L86 150 Q70 166 54 150Z" fill="${c("chin")}"/>
     <g fill="none" stroke="var(--muted)" stroke-width="1.4" opacity=".7"><path d="M36 62 Q46 57 56 62M84 62 Q94 57 104 62"/><path d="M58 122 Q70 127 82 122"/></g>
+    <text x="70" y="168" text-anchor="middle" style="font:8px var(--font-body);fill:var(--muted)">as you see yourself in a photo</text>
   </svg>`;
 }
+function countsBlock(r) {
+  return `<div class="stack" style="gap:6px"><div class="row between"><span class="label">Active spots · ${active(r)}</span><span class="tiny muted">${comedones(r)} clogged · ${inflamed(r)} inflamed</span></div>
+    <div class="counts">${LESIONS.map(([k, lab]) => `<div><b>${r.counts[k]}</b><span>${lab}</span></div>`).join("")}</div></div>`;
+}
+function reportHTML(scan) {
+  const r = scan.report, all = scans(), idx = all.findIndex((s) => s.id === scan.id);
+  const prev = all.slice(idx + 1).find((s) => s.report)?.report;
+  const sd = prev ? r.skinScore - prev.skinScore : null;
+  const zoneLevels = Object.fromEntries(ZONES.map(([k]) => [k, r.zones[k].level]));
+  const q = r.photoQuality;
+  return `
+  <div class="card">
+    <p class="tiny muted">${esc(new Date(scan.at).toLocaleString(undefined, { weekday: "long", month: "long", day: "numeric", hour: "numeric", minute: "2-digit" }))}</p>
+    <div class="hero">${ring(r.skinScore)}
+      <div class="stack" style="gap:6px">
+        <h3 style="font-size:1.15rem">${esc(r.headline || "")}</h3>
+        <div class="row" style="gap:6px">
+          <span class="pill ${r.iga <= 1 ? "good" : r.iga >= 3 ? "bad" : "warn"}">${GRADES[r.iga]} · grade ${r.iga}/4</span>
+          ${sd === null ? "" : `<span class="pill ${sd > 2 ? "good" : sd < -2 ? "bad" : ""}">${sd > 0 ? "+" : ""}${sd} vs last</span>`}
+        </div>
+        <p class="tiny muted">${esc(cap(r.acneType || ""))} acne · ${esc(cap(r.skinType || ""))} skin</p>
+      </div>
+    </div>
+    <p class="small">${esc(r.summary || "")}</p>
+    ${r.nextFocus ? `<p class="notice info small"><b>This week:</b> ${esc(r.nextFocus)}</p>` : ""}
+    ${q && (q.score < 60 || q.issues.length) ? `<p class="notice warn small"><b>Photo quality ${num(q.score)}/100.</b> ${esc(q.issues.join(". "))}</p>` : ""}
+    ${r.seeDerm ? `<p class="notice small"><b>Worth seeing a dermatologist.</b> ${esc(r.seeDermWhy || "")}</p>` : ""}
+  </div>
+  <div class="card">${countsBlock(r)}
+    <div class="twocol">
+      <div class="stack" style="gap:2px"><span class="label">Marks</span><p class="small">Red ${levelWord(r.marks.red).toLowerCase()} · Brown ${levelWord(r.marks.brown).toLowerCase()}</p>${r.marks.note ? `<p class="tiny muted">${esc(r.marks.note)}</p>` : ""}</div>
+      <div class="stack" style="gap:2px"><span class="label">Scarring</span><p class="small">${levelWord(r.scarring.level)}${r.scarring.types.length ? " · " + esc(r.scarring.types.join(", ")) : ""}</p>${r.scarring.note ? `<p class="tiny muted">${esc(r.scarring.note)}</p>` : ""}</div>
+    </div>
+  </div>
+  <div class="card"><h3>Skin breakdown</h3><div class="metrics">${metricRows(r, prev)}</div></div>
+  <div class="card"><h3>Zones</h3><div class="split"><div>${faceSVG(zoneLevels)}</div><div>${ZONES.map(([k, lab]) => `<div class="zone"><div class="row between"><b class="small">${lab}</b><span class="pill ${r.zones[k].level >= 2 ? "bad" : r.zones[k].level === 1 ? "warn" : "good"}">${levelWord(r.zones[k].level)}</span></div>${r.zones[k].note ? `<span class="tiny muted">${esc(r.zones[k].note)}</span>` : ""}</div>`).join("")}</div></div></div>
+  ${r.concerns.length ? `<div class="card"><h3>What needs attention</h3>${r.concerns.map((c) => `<div class="concern ${esc(c.priority)}"><b class="small">${esc(c.title)}</b><span class="small">${esc(c.detail)}</span></div>`).join("")}
+    ${r.strengths.length ? `<div class="stack" style="gap:4px"><span class="label">Going well</span><ul class="plain small">${r.strengths.map((s) => `<li>${esc(s)}</li>`).join("")}</ul></div>` : ""}
+    ${r.likelyTriggers.length ? `<div class="stack" style="gap:4px"><span class="label">Likely triggers</span><ul class="plain small">${r.likelyTriggers.map((s) => `<li>${esc(s)}</li>`).join("")}</ul></div>` : ""}</div>` : ""}
+  ${r.routine.am.length || r.routine.pm.length ? `<div class="card"><h3>Suggested routine</h3><div class="routine-out">
+    ${["am", "pm"].map((t) => `<div class="stack" style="gap:6px"><span class="label">${t === "am" ? "Morning" : "Evening"}</span><ol>${r.routine[t].map((s) => `<li><b>${esc(s.step)}</b>: ${esc(s.ingredient)}<br><span class="tiny muted">${esc(s.why)}</span></li>`).join("")}</ol></div>`).join("")}
+    </div>${r.routine.avoid.length ? `<div class="stack" style="gap:4px"><span class="label">Avoid</span><ul class="plain small">${r.routine.avoid.map((s) => `<li>${esc(s)}</li>`).join("")}</ul></div>` : ""}</div>` : ""}
+  ${r.changes ? `<p class="small muted">${esc(r.changes)}</p>` : ""}`;
+}
+const cap = (s) => String(s).charAt(0).toUpperCase() + String(s).slice(1);
+function openReport(id, body) {
+  const scan = body ? { ...body, id } : scans().find((s) => s.id === id);
+  if (!scan) return;
+  $("sheetTitle").textContent = scan.report ? "Skin report" : "Photo";
+  $("sheetBody").innerHTML = (scan.report ? reportHTML(scan) : "") +
+    `<div class="card"><span class="label">Photos</span><div class="shots">${[scan.photo, scan.sides?.left, scan.sides?.right].map((p) => p ? `<div class="shot filled"><img src="${esc(p)}" alt="Scan photo"></div>` : "").join("")}</div></div>`;
+  $("sheet").hidden = false; $("sheet").scrollTop = 0; document.body.style.overflow = "hidden";
+  $("sheetClose").focus();
+}
+function closeSheet() { $("sheet").hidden = true; document.body.style.overflow = ""; }
+$("sheetClose").addEventListener("click", closeSheet);
+addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("sheet").hidden) closeSheet(); });
+$("openLatest").addEventListener("click", () => { const s = scans().find((x) => x.report); s && openReport(s.id); });
 
-/* ---------------- progress ---------------- */
-let metric = "severity";
-$("metricSeg").addEventListener("click", (e) => { const b = e.target.closest("button"); if (!b) return; metric = b.dataset.m; for (const x of $("metricSeg").children) x.setAttribute("aria-pressed", String(x === b)); renderChart(); });
-
-function series() {
-  const asc = scans.slice().reverse();
-  const get = { severity: (s) => (s.ai ? s.ai.severity : null), lesions: (s) => lesionTotal(s) ?? (s.local?.ok ? s.local.spotCount : null), red: (s) => (s.local?.ok ? s.local.redPct : null) }[metric];
-  return asc.map((s) => ({ t: new Date(s.at).getTime(), v: get(s), s })).filter((p) => p.v !== null && p.v !== undefined);
+/* ---------- check-in ---------- */
+let ciTimer = null, ciPending = null, ciWriting = false;
+function today() { return { type: "day", ...(docs["day_" + todayKey()] || {}) }; }
+function patchDay(patch) {
+  const id = "day_" + todayKey();
+  const body = { ...today(), ...patch, type: "day", updated: new Date().toISOString() };
+  docs[id] = body; // optimistic
+  ciPending = { id, body };
+  $("ciSaved").textContent = "Saving…";
+  clearTimeout(ciTimer); ciTimer = setTimeout(flushDay, 700);
+  renderCheckin(); renderToday();
+}
+async function flushDay() {
+  if (ciWriting || !ciPending || !store) return;
+  const { id, body } = ciPending; ciPending = null; ciWriting = true;
+  try { await store.set(id, body); $("ciSaved").textContent = "Saved"; } catch { $("ciSaved").textContent = "Not saved, tap again"; }
+  finally { ciWriting = false; if (ciPending) flushDay(); }
+}
+function stepper(id, key, min, max, step) {
+  const el = $(id), [minus, out, plus] = el.children;
+  const set = (v) => patchDay({ [key]: v });
+  minus.addEventListener("click", () => { const cur = today()[key]; set(cur === undefined ? min : clamp(cur - step, min, max)); });
+  plus.addEventListener("click", () => { const cur = today()[key]; set(cur === undefined ? (key === "sleep" ? 7 : key === "water" ? 4 : 1) : clamp(cur + step, min, max)); });
+  return () => { const v = today()[key]; out.textContent = v === undefined ? "–" : key === "sleep" ? v + "h" : v; };
+}
+const renderers = [stepper("st-sleep", "sleep", 0, 14, 0.5), stepper("st-water", "water", 0, 20, 1), stepper("st-newspots", "newspots", 0, 30, 1)];
+function chipGroup(boxId, key, list) {
+  const box = $(boxId);
+  box.innerHTML = list.map(([k, lab]) => `<button type="button" class="chip${BAD.has(k) ? " bad" : ""}" id="c-${key}-${k}" data-k="${k}" aria-pressed="false">${esc(lab)}</button>`).join("");
+  box.addEventListener("click", (e) => { const b = e.target.closest("button"); if (!b) return; const cur = new Set(today()[key] || []); cur.has(b.dataset.k) ? cur.delete(b.dataset.k) : cur.add(b.dataset.k); patchDay({ [key]: [...cur] }); });
+  return () => { const cur = new Set(today()[key] || []); for (const b of box.children) b.setAttribute("aria-pressed", String(cur.has(b.dataset.k))); };
+}
+renderers.push(chipGroup("ch-feel", "feel", FEEL), chipGroup("ch-food", "food", FOOD), chipGroup("ch-habit", "habit", HABIT));
+(() => {
+  const box = $("seg-stress");
+  box.innerHTML = ["Calm", "Low", "Some", "High", "Very high"].map((l, i) => `<button type="button" data-v="${i + 1}" aria-pressed="false">${l}</button>`).join("");
+  box.addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) patchDay({ stress: Number(b.dataset.v) }); });
+  renderers.push(() => { const v = today().stress; for (const b of box.children) b.setAttribute("aria-pressed", String(Number(b.dataset.v) === v)); });
+})();
+let noteT;
+$("ciNote").addEventListener("input", (e) => { clearTimeout(noteT); const v = e.target.value.slice(0, 600); noteT = setTimeout(() => patchDay({ note: v }), 600); });
+$("ciRoutine").addEventListener("change", (e) => {
+  const cb = e.target.closest("input[type=checkbox]"); if (!cb) return;
+  const t = cb.dataset.t, cur = new Set(today()[t + "Done"] || []);
+  cb.checked ? cur.add(cb.dataset.id) : cur.delete(cb.dataset.id);
+  patchDay({ [t + "Done"]: [...cur] });
+});
+function renderCheckin() {
+  const r = routine(), d = today();
+  const box = $("ciRoutine");
+  const anyFocus = box.contains(document.activeElement) ? document.activeElement.id : null;
+  if (!r.am.length && !r.pm.length) {
+    box.innerHTML = `<span class="label">Routine</span>${["am", "pm"].map((t) => `<label class="checkrow" for="ci-${t}-basic"><input type="checkbox" id="ci-${t}-basic" data-t="${t}" data-id="basic" ${(d[t + "Done"] || []).includes("basic") ? "checked" : ""}><span>${t === "am" ? "Morning routine done" : "Evening routine done"}</span></label>`).join("")}<p class="tiny muted">Add your products in <a href="#routine">Routine</a> to tick off each step.</p>`;
+  } else {
+    box.innerHTML = ["am", "pm"].filter((t) => r[t].length).map((t) => `<span class="label">${t === "am" ? "Morning" : "Evening"}</span>` + r[t].map((s) => `<label class="checkrow" for="ci-${t}-${esc(s.id)}"><input type="checkbox" id="ci-${t}-${esc(s.id)}" data-t="${t}" data-id="${esc(s.id)}" ${(d[t + "Done"] || []).includes(s.id) ? "checked" : ""}><span>${esc(s.name)} <span class="tiny muted">${esc(s.kind)}</span></span></label>`).join("")).join("");
+  }
+  if (anyFocus && $(anyFocus)) $(anyFocus).focus();
+  for (const f of renderers) f();
+  if (document.activeElement !== $("ciNote")) $("ciNote").value = d.note || "";
+}
+function adherence(d) {
+  const r = routine();
+  const total = r.am.length + r.pm.length;
+  if (!total) { const n = (d.amDone || []).includes("basic") + (d.pmDone || []).includes("basic"); return d.amDone || d.pmDone ? n / 2 : null; }
+  const ids = new Set([...r.am, ...r.pm].map((s) => s.id));
+  const done = [...(d.amDone || []), ...(d.pmDone || [])].filter((x) => ids.has(x)).length;
+  return d.amDone || d.pmDone ? done / total : null;
 }
 
+/* ---------- routine editor ---------- */
+let adding = null;
+document.addEventListener("click", (e) => {
+  const a = e.target.closest("[data-add]"); if (a) { adding = a.dataset.add; renderRoutine(); setTimeout(() => $("rf-name")?.focus(), 0); }
+});
+function renderRoutine() {
+  const r = routine();
+  for (const t of ["am", "pm"]) {
+    const box = $("list-" + t);
+    let h = r[t].map((s, i) => `<div class="step"><div class="meta"><b>${esc(s.name)}</b><span class="tiny muted">${esc(s.kind)}${s.active && s.active !== "none" ? " · " + esc(ACT_NAME[s.active] || "") : ""}${s.started ? " · since " + esc(fmtShort(s.started)) : ""}</span></div>
+      <div class="row" style="gap:6px"><button class="sm ghost" data-mv="${t}:${i}:-1" aria-label="Move up" ${i === 0 ? "disabled" : ""}>↑</button><button class="sm ghost" data-del-step="${t}:${i}" aria-label="Remove ${esc(s.name)}">Remove</button></div></div>`).join("");
+    if (!r[t].length && adding !== t) h = `<p class="small muted">${t === "am" ? "Most good morning routines are: gentle cleanser, treatment or niacinamide, moisturizer, sunscreen SPF 30+." : "A solid evening routine: cleanser, one treatment (retinoid or benzoyl peroxide), moisturizer."}</p>`;
+    if (adding === t) h += `<form class="addform" id="rf"><label class="field" for="rf-name"><span class="label">Product</span><input id="rf-name" type="text" required maxlength="80" placeholder="e.g. Adapalene gel 0.1%"></label>
+      <div class="twocol"><label class="field" for="rf-kind"><span class="label">Step</span><select id="rf-kind">${KINDS.map((k) => `<option>${k}</option>`).join("")}</select></label>
+      <label class="field" for="rf-active"><span class="label">Active ingredient</span><select id="rf-active">${ACTIVES.map(([k, l]) => `<option value="${k}">${l}</option>`).join("")}</select></label></div>
+      <label class="field" for="rf-start"><span class="label">Started using it</span><input id="rf-start" type="date" value="${todayKey()}"></label>
+      <div class="row"><button class="primary grow" type="submit">Add to ${t === "am" ? "morning" : "evening"}</button><button type="button" id="rf-cancel" class="ghost">Cancel</button></div></form>`;
+    box.innerHTML = h;
+  }
+  const f = $("rf");
+  if (f) {
+    f.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const r2 = structuredClone(routine());
+      r2[adding].push({ id: "p" + Date.now().toString(36), name: $("rf-name").value.trim(), kind: $("rf-kind").value, active: $("rf-active").value, started: $("rf-start").value || todayKey() });
+      adding = null; await saveRoutine(r2);
+    });
+    $("rf-cancel").addEventListener("click", () => { adding = null; renderRoutine(); });
+  }
+  // warnings
+  const all = [...r.am.map((s) => ({ ...s, t: "am" })), ...r.pm.map((s) => ({ ...s, t: "pm" }))];
+  const has = (a, t) => all.some((s) => s.active === a && (!t || s.t === t));
+  const w = [];
+  if (all.length) {
+    if (!r.am.some((s) => s.kind === "Sunscreen")) w.push(["bad", "No sunscreen in the morning. Retinoids and acids make skin burn more easily, and UV darkens acne marks."]);
+    if ((has("tretinoin", "pm") || has("adapalene", "pm") || has("retinol", "pm")) && (has("aha", "pm") || has("sa", "pm"))) w.push(["warn", "A retinoid and an exfoliating acid on the same night often irritates. Alternate nights instead."]);
+    if (has("tretinoin", "pm") && has("bp", "pm")) w.push(["warn", "Benzoyl peroxide can break down tretinoin when applied together. Use BP in the morning (adapalene doesn't have this problem)."]);
+    if ((has("tretinoin") || has("adapalene") || has("retinol")) && !all.some((s) => s.kind === "Moisturizer")) w.push(["warn", "Add a moisturizer. Retinoids are much easier to stick with when skin isn't dry and peeling."]);
+    if (has("clinda") && !has("bp")) w.push(["warn", "Topical antibiotics should be paired with benzoyl peroxide to prevent resistant bacteria."]);
+    const actives = new Set(all.filter((s) => s.active && !["none", "niacinamide"].includes(s.active)).map((s) => s.active));
+    if (actives.size >= 4) w.push(["warn", `${actives.size} different actives is a lot. Too many at once damages the skin barrier and causes redness.`]);
+    if (!w.length) w.push(["info", "No clashes found. Give each treatment the full timeline before judging it."]);
+  }
+  $("routineWarn").innerHTML = w.map(([k, t]) => `<p class="notice ${k === "bad" ? "" : k} small">${esc(t)}</p>`).join("");
+  // timelines
+  const tl = all.filter((s) => TIMELINE[s.active] && s.started);
+  $("timelineCard").hidden = !tl.length;
+  $("timelines").innerHTML = tl.map((s) => {
+    const [wks, note] = TIMELINE[s.active], weeks = Math.max(0, Math.floor((Date.now() - new Date(s.started + "T00:00").getTime()) / (7 * 864e5)));
+    return `<div class="stack" style="gap:4px"><div class="row between"><b class="small">${esc(s.name)}</b><span class="small num">week ${weeks + 1} of ${wks}</span></div><div class="weeks"><i style="width:${Math.min(100, ((weeks + 1) / wks) * 100)}%"></i></div><span class="tiny muted">${weeks + 1 >= wks ? "You've given it the full course. Compare your scans from before you started." : esc(note)}</span></div>`;
+  }).join("");
+}
+document.addEventListener("click", async (e) => {
+  const d = e.target.closest("[data-del-step]"), m = e.target.closest("[data-mv]");
+  if (d) { const [t, i] = d.dataset.delStep.split(":"); const r2 = structuredClone(routine()); r2[t].splice(Number(i), 1); await saveRoutine(r2); }
+  if (m) { const [t, i] = m.dataset.mv.split(":").map((x, j) => (j ? Number(x) : x)); const r2 = structuredClone(routine()); const [x] = r2[t].splice(i, 1); r2[t].splice(i - 1, 0, x); await saveRoutine(r2); }
+});
+async function saveRoutine(r2) { r2.type = "routine"; docs.routine = r2; renderAll(); try { await store.set("routine", r2); } catch { toast("Couldn't save your routine. Try again."); } }
+const fmtShort = (s) => new Date(s + (s.length === 10 ? "T00:00" : "")).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+
+/* ---------- progress ---------- */
+const CHARTS = [["score", "Skin score"], ["spots", "Active spots"], ...METRICS.map(([k, l]) => ["m:" + k, l])];
+$("metricSel").innerHTML = CHARTS.map(([k, l]) => `<option value="${k}">${l}</option>`).join("");
+$("metricSel").addEventListener("change", renderChart);
 function renderChart() {
-  const pts = series(), box = $("chartBox");
-  const W = 340, H = 170, pl = 30, pr = 10, pt = 12, pb = 24;
-  const names = { severity: "Severity (0 clear – 10 severe)", lesions: "Blemishes counted", red: "Inflamed skin %" };
-  if (pts.length < 2) {
-    const demo = [6.2, 5.8, 6.4, 5.1, 4.6, 4.9, 3.8, 3.2, 2.9];
-    const path = demo.map((v, i) => `${i ? "L" : "M"}${pl + (i / (demo.length - 1)) * (W - pl - pr)},${pt + (1 - v / 10) * (H - pt - pb)}`).join(" ");
-    box.innerHTML = `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Example chart"><path d="${path}" fill="none" stroke="var(--line)" stroke-width="2.5" stroke-dasharray="5 5"/><text x="${W / 2}" y="${H / 2}" text-anchor="middle" style="font:600 12px var(--font-body);fill:var(--muted)">Example trend · yours appears after 2 scans</text></svg>`;
-    $("chartNote").textContent = !scans.length ? "Take your first scan on the Scan tab."
-      : metric === "severity" && scans.length >= 2 ? "Severity comes from Claude's analysis. Analyze your scans to chart it, or switch to Breakouts or Redness."
-      : "One more scan and your trend line starts.";
+  const key = $("metricSel").value, list = scans().filter((s) => s.report).reverse(), box = $("chartBox");
+  const W = 340, H = 180, pl = 30, pr = 10, pt = 12, pb = 24;
+  $("chartLegend").innerHTML = "";
+  if (list.length < 2) {
+    const demo = [52, 55, 51, 60, 63, 61, 68, 72, 75];
+    const path = demo.map((v, i) => `${i ? "L" : "M"}${pl + (i / (demo.length - 1)) * (W - pl - pr)},${pt + (1 - v / 100) * (H - pt - pb)}`).join(" ");
+    box.innerHTML = `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Example trend"><path d="${path}" fill="none" stroke="var(--line)" stroke-width="2.5" stroke-dasharray="5 5"/><text x="${W / 2}" y="${H / 2 + 20}" text-anchor="middle" style="font:600 12px var(--font-body);fill:var(--muted)">Example · your trend appears after 2 scans</text></svg>`;
+    $("chartNote").textContent = list.length ? "One more analyzed scan and your trend starts." : "Scan once a week, same light and angle, for a fair trend.";
     return;
   }
-  const t0 = pts[0].t, t1 = pts[pts.length - 1].t || t0 + 1;
-  let vmax = metric === "severity" ? 10 : Math.max(...pts.map((p) => p.v)) * 1.15 || 1;
-  vmax = metric === "severity" ? 10 : Math.ceil(vmax / 5) * 5;
+  const t0 = new Date(list[0].at).getTime(), t1 = new Date(list[list.length - 1].at).getTime();
   const X = (t) => pl + (t1 === t0 ? 0.5 : (t - t0) / (t1 - t0)) * (W - pl - pr);
-  const Y = (v) => pt + (1 - v / vmax) * (H - pt - pb);
-  const ticks = [0, vmax / 2, vmax];
-  const grid = ticks.map((v) => `<line x1="${pl}" x2="${W - pr}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--line)" stroke-width="1"/><text x="${pl - 6}" y="${Y(v) + 3}" text-anchor="end">${Math.round(v * 10) / 10}</text>`).join("");
+  if (key === "spots") {
+    const vmax = Math.max(5, Math.ceil(Math.max(...list.map((s) => active(s.report))) / 5) * 5);
+    const Y = (v) => pt + (1 - v / vmax) * (H - pt - pb);
+    const bw = Math.max(6, Math.min(22, (W - pl - pr) / list.length * 0.6));
+    const grid = [0, vmax / 2, vmax].map((v) => `<line x1="${pl}" x2="${W - pr}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--line)"/><text x="${pl - 6}" y="${Y(v) + 3}" text-anchor="end">${Math.round(v)}</text>`).join("");
+    const bars = list.map((s) => { const x = clamp(X(new Date(s.at).getTime()) - bw / 2, pl, W - pr - bw), c = comedones(s.report), i = inflamed(s.report);
+      return `<rect x="${x.toFixed(1)}" y="${Y(i + c).toFixed(1)}" width="${bw}" height="${(Y(i) - Y(i + c)).toFixed(1)}" fill="var(--warn)" rx="2"/><rect x="${x.toFixed(1)}" y="${Y(i).toFixed(1)}" width="${bw}" height="${(Y(0) - Y(i)).toFixed(1)}" fill="var(--flare)" rx="2"><title>${esc(fmtShort(s.at))}: ${i} inflamed, ${c} clogged</title></rect>`; }).join("");
+    box.innerHTML = `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Active spots per scan">${grid}${bars}<text x="${pl}" y="${H - 6}">${esc(fmtShort(list[0].at))}</text><text x="${W - pr}" y="${H - 6}" text-anchor="end">${esc(fmtShort(list[list.length - 1].at))}</text></svg>`;
+    $("chartLegend").innerHTML = `<span><i style="background:var(--flare)"></i>Inflamed</span><span><i style="background:var(--warn)"></i>Clogged (comedones)</span>`;
+    $("chartNote").textContent = "Fewer is better. Inflamed spots usually clear first; clogged pores take longer.";
+    return;
+  }
+  const get = key === "score" ? (s) => s.report.skinScore : (s) => s.report.metrics[key.slice(2)];
+  const pts = list.map((s) => ({ t: new Date(s.at).getTime(), v: get(s), s }));
+  const Y = (v) => pt + (1 - v / 100) * (H - pt - pb);
+  const grid = [0, 50, 100].map((v) => `<line x1="${pl}" x2="${W - pr}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--line)"/><text x="${pl - 6}" y="${Y(v) + 3}" text-anchor="end">${v}</text>`).join("");
   const line = pts.map((p, i) => `${i ? "L" : "M"}${X(p.t).toFixed(1)},${Y(p.v).toFixed(1)}`).join(" ");
   const area = `${line} L${X(t1).toFixed(1)},${Y(0)} L${X(t0).toFixed(1)},${Y(0)} Z`;
   const last = pts[pts.length - 1];
-  const dots = pts.map((p) => `<circle cx="${X(p.t).toFixed(1)}" cy="${Y(p.v).toFixed(1)}" r="${p === last ? 5 : 3}" fill="${p === last ? "var(--accent)" : "var(--surface)"}" stroke="var(--accent)" stroke-width="2"><title>${esc(fmtDate(p.s.at))}: ${esc(p.v)}</title></circle>`).join("");
-  const xl = `<text x="${pl}" y="${H - 6}">${esc(fmtDate(pts[0].s.at))}</text><text x="${W - pr}" y="${H - 6}" text-anchor="end">${esc(fmtDate(last.s.at))}</text>`;
-  box.innerHTML = `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(names[metric])} over time"><defs><linearGradient id="ga" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--accent)" stop-opacity=".28"/><stop offset="1" stop-color="var(--accent)" stop-opacity="0"/></linearGradient></defs>${grid}<path d="${area}" fill="url(#ga)"/><path d="${line}" fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linejoin="round"/>${dots}${xl}</svg>`;
-  $("chartNote").textContent = names[metric] + ". Lower is better." + (metric === "lesions" ? " Uses Claude's count when available, otherwise the red-spot estimate." : "");
+  const dots = pts.map((p) => `<circle cx="${X(p.t).toFixed(1)}" cy="${Y(p.v).toFixed(1)}" r="${p === last ? 5 : 3}" fill="${p === last ? "var(--accent)" : "var(--surface)"}" stroke="var(--accent)" stroke-width="2"><title>${esc(fmtShort(p.s.at))}: ${p.v}</title></circle>`).join("");
+  box.innerHTML = `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(CHARTS.find((c) => c[0] === key)[1])} over time"><defs><linearGradient id="ga" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--accent)" stop-opacity=".26"/><stop offset="1" stop-color="var(--accent)" stop-opacity="0"/></linearGradient></defs>${grid}<path d="${area}" fill="url(#ga)"/><path d="${line}" fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linejoin="round"/>${dots}<text x="${pl}" y="${H - 6}">${esc(fmtShort(list[0].at))}</text><text x="${W - pr}" y="${H - 6}" text-anchor="end">${esc(fmtShort(last.s.at))}</text><text x="${(X(last.t) - 8).toFixed(1)}" y="${(Y(last.v) - 9).toFixed(1)}" text-anchor="end" style="font:600 11px var(--font-mono);fill:var(--ink)">${last.v}</text></svg>`;
+  $("chartNote").textContent = "Out of 100, higher is better.";
 }
-
 function streak() {
-  const days = new Set(scans.map((s) => s.day));
+  const set = new Set(days().map((d) => d.id.slice(4)));
+  for (const s of scans()) set.add(s.day);
   const d = new Date(); let n = 0;
-  if (!days.has(dayKey(d))) d.setDate(d.getDate() - 1);
-  while (days.has(dayKey(d))) { n++; d.setDate(d.getDate() - 1); }
+  if (!set.has(dayKey(d))) d.setDate(d.getDate() - 1);
+  while (set.has(dayKey(d))) { n++; d.setDate(d.getDate() - 1); }
   return n;
 }
-
 function renderProgress() {
-  const withAI = scans.filter((s) => s.ai);
-  const latest = withAI[0], first = withAI[withAI.length - 1];
-  $("stLatest").textContent = latest ? latest.ai.severity.toFixed(1) : (scans[0]?.local?.ok ? scans[0].local.spotCount : "–");
-  $("stLatestSub").textContent = latest ? iga(latest.ai.severity) : (scans[0] ? "red spots" : "severity / 10");
+  const list = scans(), rep = list.filter((s) => s.report), latest = rep[0], first = rep[rep.length - 1], prev = rep[1];
+  $("stScore").textContent = latest ? latest.report.skinScore : "–";
+  $("stScoreSub").textContent = latest ? GRADES[latest.report.iga] : "out of 100";
+  $("stActive").textContent = latest ? active(latest.report) : "–";
+  $("stActiveSub").textContent = latest ? inflamed(latest.report) + " inflamed" : "on latest scan";
   $("stStreak").textContent = streak();
   const tp = $("trendPill");
   if (latest && first && latest !== first) {
-    const d = latest.ai.severity - first.ai.severity;
-    $("stChange").textContent = (d > 0 ? "+" : "") + d.toFixed(1);
-    $("stChangeSub").textContent = "over " + Math.max(1, Math.round((new Date(latest.at) - new Date(first.at)) / 864e5)) + " days";
-    tp.hidden = false; tp.className = "pill " + (d < -0.4 ? "good" : d > 0.4 ? "bad" : "");
-    tp.textContent = d < -0.4 ? "Improving" : d > 0.4 ? "Flaring" : "Steady";
-  } else { $("stChange").textContent = "–"; $("stChangeSub").textContent = "change"; tp.hidden = true; }
+    const d = latest.report.skinScore - first.report.skinScore;
+    tp.hidden = false; tp.className = "pill " + (d >= 3 ? "good" : d <= -3 ? "bad" : "");
+    tp.textContent = (d >= 3 ? "Improving" : d <= -3 ? "Worse" : "Steady") + ` · ${d > 0 ? "+" : ""}${d} since ${fmtShort(first.at)}`;
+  } else tp.hidden = true;
   renderChart();
+  $("progMetrics").innerHTML = latest ? metricRows(latest.report, prev?.report) : `<p class="small muted">Your first analyzed scan fills this in: clarity, calmness, even tone, smoothness, pores, oil, hydration, glow and under-eyes, each out of 100.</p>`;
 
-  // zone map: average of last 5 AI scans
-  const recent = withAI.slice(0, 5);
-  const avg = {}; for (const [k] of ZONES) avg[k] = recent.length ? recent.reduce((n, s) => n + (Number(s.ai.zones?.[k]) || 0), 0) / recent.length : 0;
+  const recent = rep.slice(0, 4);
+  const avg = {}; for (const [k] of ZONES) avg[k] = recent.length ? recent.reduce((n, s) => n + s.report.zones[k].level, 0) / recent.length : 0;
   $("faceMap").innerHTML = faceSVG(Object.fromEntries(Object.entries(avg).map(([k, v]) => [k, Math.round(v)])));
   $("zoneList").innerHTML = recent.length
-    ? ZONES.slice().sort((a, b) => avg[b[0]] - avg[a[0]]).map(([k, lab]) => `<div class="row" style="justify-content:space-between"><span>${lab}</span><span class="num muted">${avg[k].toFixed(1)} / 3</span></div>`).join("") + `<p class="muted">Average of your last ${recent.length} analyzed scan${recent.length > 1 ? "s" : ""}.</p>`
-    : `<p class="muted">Analyze a scan with Claude to map which zones break out most. Chin and jawline spots often track hormones; forehead spots can track hair products.</p>`;
+    ? ZONES.slice().sort((a, b) => avg[b[0]] - avg[a[0]]).map(([k, lab]) => `<div class="zone"><div class="row between"><b class="small">${lab}</b><span class="num small muted">${avg[k].toFixed(1)}/3</span></div><span class="tiny muted">${ZONE_HINT[k]}</span></div>`).join("") + `<p class="tiny muted" style="margin-top:6px">Average of your last ${recent.length} scan${recent.length > 1 ? "s" : ""}.</p>`
+    : `<p class="small muted">After a scan, this shows where you break out most. Chin and jaw spots often follow hormones; forehead spots can follow hair products; one cheek often matches the side you hold your phone or sleep on.</p>`;
+
+  // adherence grid
+  const map = Object.fromEntries(days().map((d) => [d.id.slice(4), d]));
+  const cells = []; let sum = 0, cnt = 0;
+  for (let i = 13; i >= 0; i--) { const d = new Date(Date.now() - i * 864e5), k = dayKey(d), a = map[k] ? adherence(map[k]) : null; if (a !== null) { sum += a; cnt++; } cells.push({ k, a, d }); }
+  $("adhGrid").innerHTML = `<div class="adh"><span></span>${cells.map((c) => `<span style="text-align:center">${c.d.toLocaleDateString(undefined, { weekday: "narrow" })}</span>`).join("")}<span>Done</span>${cells.map((c) => `<i class="${c.a === null ? "" : c.a >= 0.99 ? "full" : c.a > 0 ? "part" : ""}" title="${esc(c.k)}: ${c.a === null ? "no check-in" : Math.round(c.a * 100) + "%"}"></i>`).join("")}</div>`;
+  $("adhPct").textContent = cnt ? Math.round((sum / 14) * 100) + "% over 14 days" : "";
+
+  renderInsights(rep, map);
 
   // compare
-  const opts = scans.map((s) => `<option value="${esc(s.id)}">${esc(fmtFull(s.at))}${s.ai ? " · " + esc(s.ai.severity.toFixed(1)) : ""}</option>`).join("");
-  const a = $("cmpA"), b = $("cmpB"), keepA = a.value, keepB = b.value;
+  const opts = list.map((s) => `<option value="${esc(s.id)}">${esc(new Date(s.at).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }))}${s.report ? " · " + s.report.skinScore : ""}</option>`).join("");
+  const a = $("cmpA"), b = $("cmpB"), ka = a.value, kb = b.value;
   a.innerHTML = opts; b.innerHTML = opts;
-  if (scans.length) {
-    a.value = scans.some((s) => s.id === keepA) ? keepA : scans[scans.length - 1].id;
-    b.value = scans.some((s) => s.id === keepB) ? keepB : scans[0].id;
-  }
+  if (list.length) { a.value = list.some((s) => s.id === ka) ? ka : list[list.length - 1].id; b.value = list.some((s) => s.id === kb) ? kb : list[0].id; }
   updateCompare();
-
-  // insights: severity (or spot count) with vs without each factor
-  const val = (s) => (s.ai ? s.ai.severity : null);
-  const pool = scans.filter((s) => val(s) !== null);
-  const rows = [];
-  for (const [k, lab] of FACTORS) {
-    const yes = pool.filter((s) => (s.factors || []).includes(k)), no = pool.filter((s) => !(s.factors || []).includes(k));
-    if (yes.length >= 2 && no.length >= 2) {
-      const m = (l) => l.reduce((n, s) => n + val(s), 0) / l.length;
-      rows.push({ lab, d: m(yes) - m(no), n: yes.length });
-    }
-  }
-  rows.sort((x, y) => Math.abs(y.d) - Math.abs(x.d));
-  $("insights").innerHTML = rows.length
-    ? rows.slice(0, 6).map((r) => `<div class="insight"><span>${esc(r.lab)} <span class="small muted">· ${r.n} days</span></span><span class="pill ${r.d > 0.3 ? "bad" : r.d < -0.3 ? "good" : ""}">${r.d > 0.3 ? "Worse" : r.d < -0.3 ? "Better" : "No change"} ${r.d >= 0 ? "+" : ""}${r.d.toFixed(1)}</span></div>`).join("") + `<p class="small muted" style="margin-top:8px">Severity on days with the tag minus days without. Patterns need a few weeks of scans before they mean much.</p>`
-    : `<p class="small muted">Tag your days when you save a scan (sleep, stress, dairy, new products…). Once a tag shows up on at least 2 analyzed scans, and is missing on 2 others, Clearday shows whether your skin tends to be better or worse on those days.</p>`;
+  renderHistory(list);
 }
+function renderInsights(rep, map) {
+  // For each scan: average the check-ins from the scan day and the 3 days before.
+  const rows = rep.map((s) => {
+    const win = []; for (let i = 0; i <= 3; i++) { const k = dayKey(new Date(new Date(s.at).getTime() - i * 864e5)); if (map[k]) win.push(map[k]); }
+    return { score: s.report.skinScore, win };
+  }).filter((r) => r.win.length);
+  const feats = [
+    ["Slept under 7h", (w) => avgOf(w, "sleep"), (v) => v < 7],
+    ["High stress", (w) => avgOf(w, "stress"), (v) => v >= 3.5],
+    ["Under 6 glasses of water", (w) => avgOf(w, "water"), (v) => v < 6],
+    ["Sugary / refined carbs", (w) => anyTag(w, "food", "sugar"), (v) => v],
+    ["Milk", (w) => anyTag(w, "food", "milk"), (v) => v],
+    ["Whey protein", (w) => anyTag(w, "food", "whey"), (v) => v],
+    ["Alcohol", (w) => anyTag(w, "food", "alcohol"), (v) => v],
+    ["Picked / popped", (w) => anyTag(w, "habit", "picked"), (v) => v],
+    ["Didn't wash after sweating", (w) => anyTag(w, "habit", "noshower"), (v) => v],
+    ["Period", (w) => anyTag(w, "habit", "period"), (v) => v],
+    ["Routine under 80%", (w) => { const a = w.map(adherence).filter((x) => x !== null); return a.length ? a.reduce((x, y) => x + y, 0) / a.length : null; }, (v) => v < 0.8],
+  ];
+  const out = [];
+  for (const [lab, f, test] of feats) {
+    const yes = [], no = [];
+    for (const r of rows) { const v = f(r.win); if (v === null || v === undefined) continue; (test(v) ? yes : no).push(r.score); }
+    if (yes.length >= 2 && no.length >= 2) { const m = (l) => l.reduce((a, b) => a + b, 0) / l.length; out.push({ lab, d: m(yes) - m(no), n: yes.length + no.length }); }
+  }
+  out.sort((a, b) => Math.abs(b.d) - Math.abs(a.d));
+  $("insights").innerHTML = out.length
+    ? out.slice(0, 6).map((r) => `<div class="insight"><span class="small">${esc(r.lab)} <span class="tiny muted">· ${r.n} scans</span></span><span class="pill ${r.d <= -3 ? "bad" : r.d >= 3 ? "good" : ""}">${r.d <= -3 ? "Worse skin" : r.d >= 3 ? "Better skin" : "No clear effect"} ${r.d > 0 ? "+" : ""}${Math.round(r.d)}</span></div>`).join("") + `<p class="tiny muted" style="margin-top:8px">Skin score when the factor showed up in the 3 days before a scan, compared with when it didn't. This shows a link, not proof of cause.</p>`
+    : `<p class="small muted">Log check-ins daily and scan about once a week. After 4 or more scans with check-ins around them, this compares your skin score after short sleep, stress, sugar, milk, picking, missed routine and more.</p>`;
+  $("askPatterns").hidden = !(rep.length >= 2 && days().length >= 3);
+}
+const avgOf = (w, k) => { const v = w.map((d) => d[k]).filter((x) => typeof x === "number"); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null; };
+const anyTag = (w, g, k) => w.some((d) => (d[g] || []).includes(k));
+$("askPatterns").addEventListener("click", async () => {
+  const sm = await getSample(); const out = $("patternOut"), btn = $("askPatterns");
+  if (!sm) { out.innerHTML = `<p class="muted">Claude isn't available in this view.</p>`; return; }
+  btn.disabled = true; btn.textContent = "Reading your data…"; out.textContent = "";
+  const sc = scans().filter((s) => s.report).reverse().map((s) => `${s.day}: score ${s.report.skinScore}, IGA ${s.report.iga}, inflamed ${inflamed(s.report)}, clogged ${comedones(s.report)}, zones ${ZONES.map(([k]) => k + ":" + s.report.zones[k].level).join(" ")}`).join("\n");
+  const ds = days().sort((a, b) => (a.id > b.id ? 1 : -1)).slice(-60).map((d) => `${d.id.slice(4)}: sleep ${d.sleep ?? "?"}, stress ${d.stress ?? "?"}, water ${d.water ?? "?"}, newspots ${d.newspots ?? "?"}, routine ${adherence(d) === null ? "?" : Math.round(adherence(d) * 100) + "%"}, tags ${[...(d.feel || []), ...(d.food || []), ...(d.habit || [])].join("/") || "-"}`).join("\n");
+  const r = routine();
+  try {
+    const res = await sm.s(`You are a careful skincare data analyst. Below is one person's acne journal. Find the 2-4 most meaningful patterns linking their habits, routine and cycle to their skin, remembering acne lags triggers by 1-3 days and treatments take 8-12 weeks. Be specific (cite dates and numbers), say how confident you are, and don't overclaim from little data. End with one concrete experiment to run for the next 2 weeks. Plain text, short paragraphs, no markdown headings, under 220 words.
 
+Routine: AM ${r.am.map((s) => s.name + (s.started ? " since " + s.started : "")).join(", ") || "not set"}; PM ${r.pm.map((s) => s.name + (s.started ? " since " + s.started : "")).join(", ") || "not set"}
+SCANS:
+${sc}
+CHECK-INS:
+${ds}`, { modelTier: "default", onText: ({ text }) => { out.innerHTML = text.split(/\n{2,}/).map((p) => `<p>${esc(p)}</p>`).join(""); } });
+    out.innerHTML = res.text.split(/\n{2,}/).map((p) => `<p>${esc(p)}</p>`).join("");
+  } catch (e) { out.innerHTML = `<p class="muted">${e && e.code === "rate_limited" ? "Usage limit reached. Try again later." : "That didn't finish. Try again."}</p>`; }
+  finally { btn.disabled = false; btn.textContent = "Ask Claude to read my patterns"; }
+});
 function updateCompare() {
-  const A = scans.find((s) => s.id === $("cmpA").value), B = scans.find((s) => s.id === $("cmpB").value);
-  const box = $("compare");
-  if (!A || !B) { $("cmpImgA").removeAttribute("src"); $("cmpImgB").removeAttribute("src"); box.style.display = "none"; return; }
-  box.style.display = ""; $("cmpImgA").src = A.photo; $("cmpImgB").src = B.photo;
+  const list = scans(), A = list.find((s) => s.id === $("cmpA").value), B = list.find((s) => s.id === $("cmpB").value);
+  $("compare").hidden = !(A && B);
+  if (A && B) { $("cmpImgA").src = A.photo; $("cmpImgB").src = B.photo; }
 }
 $("cmpA").addEventListener("change", updateCompare);
 $("cmpB").addEventListener("change", updateCompare);
 $("cmpCut").addEventListener("input", (e) => $("compare").style.setProperty("--cut", e.target.value + "%"));
-
-/* ---------------- history ---------------- */
 let confirmId = null;
-function renderHistory() {
-  $("histCount").textContent = scans.length ? scans.length + " scan" + (scans.length > 1 ? "s" : "") : "";
-  const list = $("histList");
-  if (!scans.length) { list.innerHTML = `<div class="card"><h3>No scans yet</h3><p class="small muted">Each scan you save shows up here with its photo, severity and tags. Start on the Scan tab.</p><a class="btn primary" href="#scan">Take your first scan</a></div>`; return; }
-  list.innerHTML = scans.map((s) => {
-    const tags = (s.factors || []).map((k) => FACTORS.find((f) => f[0] === k)?.[1]).filter(Boolean);
-    const sev = s.ai ? `<span class="pill ${s.ai.severity <= 2.5 ? "good" : s.ai.severity >= 6 ? "bad" : "warn"}">${esc(iga(s.ai.severity))} · ${esc(s.ai.severity.toFixed(1))}</span>` : `<span class="pill">${s.local?.ok ? esc(s.local.spotCount) + " red spots" : "Photo only"}</span>`;
-    return `<div class="hitem"><img src="${esc(s.photo)}" alt="Scan from ${esc(fmtFull(s.at))}" loading="lazy">
-      <div class="meta"><b>${esc(fmtFull(s.at))}</b><div>${sev}</div>
-        ${tags.length ? `<p class="small muted">${esc(tags.join(" · "))}</p>` : ""}${s.note ? `<p class="small muted">${esc(s.note)}</p>` : ""}</div>
-      <div class="acts">${confirmId === s.id ? `<button class="danger" data-del="${esc(s.id)}">Delete</button><button data-cancel="1">Keep</button>` : `<button class="ghost" data-ask="${esc(s.id)}" aria-label="Delete scan from ${esc(fmtFull(s.at))}">Delete</button>`}</div></div>`;
-  }).join("");
+function renderHistory(list) {
+  $("histCount").textContent = list.length ? list.length + " total" : "";
+  $("histList").innerHTML = list.length ? list.map((s) => `<div class="hitem"><img src="${esc(s.photo)}" alt="" loading="lazy">
+    <div class="meta"><b class="small">${esc(new Date(s.at).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" }))}</b>
+      ${s.report ? `<div class="row" style="gap:6px"><span class="pill" style="color:${scoreCol(s.report.skinScore)}">${s.report.skinScore}/100</span><span class="tiny muted">${active(s.report)} spots · ${GRADES[s.report.iga]}</span></div>` : `<span class="tiny muted">Photo only</span>`}</div>
+    <div class="acts">${confirmId === s.id ? `<button class="sm danger" data-del="${esc(s.id)}">Delete</button><button class="sm" data-cancel="1">Keep</button>` : `<button class="sm" data-open="${esc(s.id)}">View</button><button class="sm ghost" data-ask="${esc(s.id)}">Delete</button>`}</div></div>`).join("")
+    : `<p class="small muted">Scans you save appear here with their score. Tap View to reopen the full report.</p>`;
 }
 $("histList").addEventListener("click", async (e) => {
   const b = e.target.closest("button"); if (!b) return;
-  if (b.dataset.ask) { confirmId = b.dataset.ask; renderHistory(); }
-  else if (b.dataset.cancel) { confirmId = null; renderHistory(); }
-  else if (b.dataset.del) { const id = b.dataset.del; confirmId = null; try { await store.remove(id); toast("Scan deleted"); } catch { toast("Couldn't delete. Try again."); renderHistory(); } }
+  if (b.dataset.open) openReport(b.dataset.open);
+  else if (b.dataset.ask) { confirmId = b.dataset.ask; renderHistory(scans()); }
+  else if (b.dataset.cancel) { confirmId = null; renderHistory(scans()); }
+  else if (b.dataset.del) { const id = b.dataset.del; confirmId = null; try { await store.remove(id); toast("Scan deleted"); } catch { toast("Couldn't delete. Try again."); } }
 });
 
-/* ---------------- routing / render ---------------- */
+/* ---------- today summary ---------- */
 function renderToday() {
-  const today = scans.find((s) => s.day === dayKey(new Date()));
-  const p = $("todayPill"); p.hidden = !today;
-  if (today) { p.className = "pill good"; p.textContent = "Scanned today ✓"; }
+  const list = scans(), t = list.find((s) => s.day === todayKey());
+  const p = $("todayPill"); p.hidden = !t; if (t) { p.className = "pill good"; p.textContent = "Scanned today ✓"; }
+  const latest = list.find((s) => s.report);
+  $("latestCard").hidden = !latest;
+  if (latest) {
+    const r = latest.report;
+    $("latestSummary").innerHTML = `<div class="hero">${ring(r.skinScore, 84)}<div class="stack" style="gap:4px"><b>${esc(r.headline || GRADES[r.iga])}</b><span class="tiny muted">${esc(fmtShort(latest.at))} · ${active(r)} active spots · ${GRADES[r.iga]}</span>${r.nextFocus ? `<span class="small">${esc(r.nextFocus)}</span>` : ""}</div></div>`;
+  }
+  const h = new Date().getHours();
+  $("greeting").textContent = (h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening") + ". Check in, scan weekly.";
 }
-function renderAll() { renderToday(); renderProgress(); renderHistory(); }
+
+/* ---------- misc ---------- */
+let toastT;
+function toast(msg) { let t = document.querySelector(".toast"); if (!t) { t = document.createElement("div"); t.className = "toast"; t.setAttribute("role", "status"); document.body.appendChild(t); } t.textContent = msg; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => (t.hidden = true), 2800); }
+function renderAll() { renderToday(); renderCheckin(); renderProgress(); renderRoutine(); }
+const VIEWS = ["today", "progress", "routine", "learn"];
 function route() {
-  const v = ["scan", "progress", "history"].includes(location.hash.slice(1)) ? location.hash.slice(1) : "scan";
-  for (const n of ["scan", "progress", "history"]) $("view-" + n).hidden = n !== v;
-  for (const a of document.querySelectorAll("nav.tabs a")) a.toggleAttribute("aria-current", a.dataset.v === v), a.dataset.v === v && a.setAttribute("aria-current", "page");
-  window.scrollTo(0, 0);
+  const v = VIEWS.includes(location.hash.slice(1)) ? location.hash.slice(1) : "today";
+  for (const n of VIEWS) $("view-" + n).hidden = n !== v;
+  for (const a of document.querySelectorAll("nav.tabs a")) { if (a.dataset.v === v) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current"); }
+  closeSheet(); window.scrollTo(0, 0);
 }
 addEventListener("hashchange", route);
-route(); renderAll(); initStore();
+route(); renderShots(); renderAll(); initStore();
 })();
 </script>
