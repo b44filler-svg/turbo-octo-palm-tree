@@ -180,6 +180,10 @@ input[type=range] { width: 100%; accent-color: var(--accent) }
 .step { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: center; padding-block: 10px; border-top: 1px solid var(--line) }
 .step:first-child { border-top: 0 }
 .step .meta { display: grid; gap: 2px; min-width: 0 }
+.prod { display: grid; gap: 8px; padding: 12px; border: 1px solid var(--line); border-radius: 12px; min-width: 0 }
+.memrow { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: center; padding-block: 8px; border-top: 1px solid var(--line) }
+.memrow:first-child { border-top: 0 }
+form.memrow { grid-template-columns: 1fr; }
 .addform { display: grid; gap: 10px; padding: 12px; border-radius: 12px; background: var(--sunk) }
 .weeks { height: 8px; border-radius: 999px; background: var(--sunk); overflow: hidden }
 .weeks i { display: block; height: 100%; background: var(--accent) }
@@ -323,8 +327,28 @@ nav.tabs svg { width: 24px; height: 24px }
   <!-- ROUTINE -->
   <section class="view" id="view-routine" hidden>
     <div class="card">
+      <div class="row between"><h2>What Clearday remembers</h2><button class="sm" id="memAdd">+ Add</button></div>
+      <p class="small muted">Claude reads this before every scan and pattern check, so its advice fits you. Scans add what they learn; you can edit or remove anything.</p>
+      <form id="memForm" class="addform" hidden><label class="field" for="memText"><span class="label">Something to remember</span><input id="memText" type="text" maxlength="200" placeholder="e.g. Fragrance makes my skin sting"></label><div class="row"><button class="primary grow" type="submit">Remember</button><button type="button" class="ghost" id="memCancel">Cancel</button></div></form>
+      <div id="memList"></div>
+    </div>
+
+    <div class="card">
+      <div class="row between"><h2>My products</h2><span class="small muted" id="prodCount"></span></div>
+      <p class="small muted">Everything you put on your face, including shaving products. Scan the label and Claude reads the ingredients, flags anything that can clog pores or irritate, and checks it against your routine.</p>
+      <div class="row">
+        <label class="btn primary grow" for="prodPhoto"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>Scan a label<input id="prodPhoto" type="file" accept="image/*" capture="environment"></label>
+        <button class="grow" id="prodManual" type="button">Add by hand</button>
+      </div>
+      <div id="prodStatus"></div>
+      <div id="prodFormBox"></div>
+      <div class="seg" id="prodFilter" role="group" aria-label="Show products"><button type="button" data-f="using" aria-pressed="true">Using</button><button type="button" data-f="all" aria-pressed="false">All</button></div>
+      <div id="prodList" class="stack"></div>
+    </div>
+
+    <div class="card">
       <h2>My routine</h2>
-      <p class="small muted">Add what you actually use. Clearday ticks it off in your daily check-in, counts the weeks on each treatment, and flags combinations that clash.</p>
+      <p class="small muted">Built from your products. Steps appear in your daily check-in on the days you use them.</p>
       <div id="routineWarn" class="stack"></div>
     </div>
     <div class="card"><div class="row between"><h3>Morning</h3><button class="sm" data-add="am">+ Add step</button></div><div id="list-am"></div></div>
@@ -446,7 +470,7 @@ nav.tabs svg { width: 24px; height: 24px }
 <nav class="tabs" aria-label="Sections"><div class="in">
   <a href="#today" data-v="today"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2"/><circle cx="12" cy="12" r="3.5"/></svg>Today</a>
   <a href="#progress" data-v="progress"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 19h16M5 15l4-5 4 3 6-7"/></svg>Progress</a>
-  <a href="#routine" data-v="routine"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="8" y="3" width="8" height="5" rx="1"/><path d="M7 8h10l1 13H6z"/></svg>Routine</a>
+  <a href="#routine" data-v="routine"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="8" y="3" width="8" height="5" rx="1"/><path d="M7 8h10l1 13H6z"/></svg>My skin</a>
   <a href="#learn" data-v="learn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 5.5C6.5 4 9.5 4 12 6c2.5-2 5.5-2 8-.5V19c-2.5-1.5-5.5-1.5-8 .5-2.5-2-5.5-2-8-.5z"/><path d="M12 6v13.5"/></svg>Learn</a>
 </div></nav>
 
@@ -469,9 +493,9 @@ const ZONE_HINT = { forehead: "Hair products, fringes, hats", nose: "Oil and bla
 const GRADES = ["Clear", "Almost clear", "Mild", "Moderate", "Severe"];
 const FEEL = [["oily", "Oily"], ["dry", "Dry / tight"], ["itchy", "Itchy"], ["sting", "Stinging"], ["sore", "Sore spots"], ["calm", "Calm"]];
 const FOOD = [["sugar", "Sugary / refined carbs"], ["milk", "Milk"], ["whey", "Whey protein"], ["fast", "Fast food"], ["alcohol", "Alcohol"], ["veg", "Lots of veg"]];
-const HABIT = [["picked", "Picked / popped"], ["touch", "Touched face a lot"], ["workout", "Workout"], ["noshower", "Didn't wash after sweating"], ["pillow", "Fresh pillowcase"], ["sun", "Sun without SPF"], ["makeupbed", "Slept in makeup"], ["period", "Period"], ["newprod", "Started new product"]];
+const HABIT = [["picked", "Picked / popped"], ["touch", "Touched face a lot"], ["workout", "Workout"], ["noshower", "Didn't wash after sweating"], ["pillow", "Fresh pillowcase"], ["sun", "Sun without SPF"], ["makeupbed", "Slept in makeup"], ["shaved", "Shaved"], ["period", "Period"], ["newprod", "Started new product"]];
 const BAD = new Set(["sugar", "milk", "whey", "fast", "alcohol", "picked", "touch", "noshower", "sun", "makeupbed", "itchy", "sting", "sore"]);
-const KINDS = ["Cleanser", "Treatment", "Moisturizer", "Sunscreen", "Exfoliant", "Spot treatment", "Other"];
+const KINDS = ["Cleanser", "Treatment", "Moisturizer", "Sunscreen", "Exfoliant", "Spot treatment", "Shaving", "Other"];
 const ACTIVES = [["none", "No active ingredient"], ["adapalene", "Adapalene"], ["tretinoin", "Tretinoin / prescription retinoid"], ["retinol", "Retinol"], ["bp", "Benzoyl peroxide"], ["sa", "Salicylic acid (BHA)"], ["aha", "Glycolic / lactic acid (AHA)"], ["azelaic", "Azelaic acid"], ["niacinamide", "Niacinamide"], ["clinda", "Clindamycin / topical antibiotic"], ["other", "Other active"]];
 const ACT_NAME = Object.fromEntries(ACTIVES);
 const TIMELINE = { adapalene: [12, "Purging in weeks 2–6 is normal. Judge it at week 12."], tretinoin: [12, "Irritation settles by weeks 4–6. Judge it at week 12."], retinol: [12, "Gentler and slower than adapalene."], bp: [8, "Inflamed spots usually calm within 4–8 weeks."], sa: [8, "Blackheads improve over 6–8 weeks."], aha: [8, "Texture improves over 6–8 weeks."], azelaic: [12, "Redness and marks fade over 8–16 weeks."], niacinamide: [8, "Redness and oil improve within 4–8 weeks."], clinda: [12, "Pair with benzoyl peroxide to prevent resistance. Limit to about 12 weeks."] };
@@ -548,8 +572,8 @@ for (const k of ["front", "left", "right"]) {
     try {
       const { img, url } = await loadImage(f);
       const send = cropCanvas(img, 1100);
-      const thumb = cropCanvas(img, k === "front" ? 640 : 380);
-      shots[k] = { blob: await toBlob(send, 0.88), thumb: thumb.toDataURL("image/jpeg", k === "front" ? 0.74 : 0.66) };
+      const thumb = cropCanvas(img, k === "front" ? 520 : 300);
+      shots[k] = { blob: await toBlob(send, 0.88), thumb: thumb.toDataURL("image/jpeg", k === "front" ? 0.7 : 0.6) };
       URL.revokeObjectURL(url);
       renderShots();
     } catch { toast("Couldn't read that photo. Try a JPEG or PNG."); }
@@ -584,13 +608,17 @@ function showSteps(i) {
 }
 function contextForPrompt() {
   const prev = scans().find((s) => s.report && !s.report.notFace);
-  const r = routine();
-  const fmtSteps = (l) => l.map((x) => `${x.name} (${x.kind}${x.active && x.active !== "none" ? ", " + ACT_NAME[x.active] : ""}${x.started ? ", since " + x.started : ""})`).join("; ") || "none listed";
+  const fmtSteps = (l) => l.map((x) => `${x.name} (${x.kind}${x.active && x.active !== "none" ? ", " + ACT_NAME[x.active] : ""}${x.started ? ", since " + x.started : ""}${x.days && x.days.length ? ", " + daysLabel(x.days) : ""})`).join("; ") || "none listed";
+  const prods = products().map((p) => `${p.name}${p.brand ? " [" + p.brand + "]" : ""}: ${p.kind}, ${p.status}${p.active && p.active !== "none" ? ", active " + ACT_NAME[p.active] : ""}${p.started ? ", started " + p.started : ""}, verdict ${p.verdict || "unsure"}${p.flags && p.flags.length ? ", flags: " + p.flags.join("/") : ""}${p.notes ? ", notes: " + String(p.notes).slice(0, 100) : ""}`).join("\n");
   const recent = days().filter((d) => d.id >= "day_" + dayKey(new Date(Date.now() - 7 * 864e5))).sort((a, b) => (a.id > b.id ? 1 : -1));
   const ci = recent.map((d) => `${d.id.slice(4)}: sleep ${d.sleep ?? "?"}h, stress ${d.stress ?? "?"}/5, water ${d.water ?? "?"}, new spots ${d.newspots ?? "?"}, tags [${[...(d.feel || []), ...(d.food || []), ...(d.habit || [])].join(", ")}], routine ${adherence(d) === null ? "?" : Math.round(adherence(d) * 100) + "%"}${d.note ? ", note: " + String(d.note).slice(0, 120) : ""}`).join("\n");
   return `CONTEXT FROM THE USER'S JOURNAL
-Morning routine: ${fmtSteps(r.am)}
-Evening routine: ${fmtSteps(r.pm)}
+What Clearday remembers about this person (treat as true unless the photos clearly contradict it):
+${memoryText() || "nothing yet"}
+Their products:
+${prods || "none listed"}
+Morning routine: ${fmtSteps(routineFull("am"))}
+Evening routine: ${fmtSteps(routineFull("pm"))}
 Last 7 days of check-ins:
 ${ci || "none yet"}
 ${prev ? `Previous scan (${prev.at.slice(0, 10)}): skinScore ${prev.report.skinScore}, IGA ${prev.report.iga}, counts ${JSON.stringify(prev.report.counts)}, metrics ${JSON.stringify(prev.report.metrics)}.` : "This is their first scan."}`;
@@ -623,7 +651,9 @@ Return ONLY one JSON object with exactly these keys:
  "changes": one sentence comparing with the previous scan, or "" if first scan,
  "nextFocus": one sentence: the single most useful thing to do this week,
  "seeDerm": boolean (true if nodules/cysts, scarring, IGA >= 3, or no improvement despite 12+ weeks of treatment),
- "seeDermWhy": short string or ""
+ "seeDermWhy": short string or "",
+ "productAdvice": 0-4 objects {"product": exact name from their product list, "advice": one sentence: keep, change how it's used, or stop, and why based on what you see} ([] if they have no products listed),
+ "memory": 0-3 short, durable facts about this person's skin worth remembering for future scans (skin type, where they break out, recurring patterns, what seems to help or hurt). Only facts NOT already in the remembered list; [] if nothing new
 }
 If photo quality limits the assessment, still give your best estimate and list the issue.`;
 }
@@ -675,7 +705,7 @@ function normalize(r) {
   r.zones = r.zones || {}; for (const [k] of ZONES) { const z = r.zones[k]; r.zones[k] = typeof z === "object" && z ? { level: clamp(Math.round(num(z.level)), 0, 3), note: String(z.note || "") } : { level: clamp(Math.round(num(z)), 0, 3), note: "" }; }
   r.marks = r.marks || {}; r.marks.red = clamp(Math.round(num(r.marks.red)), 0, 3); r.marks.brown = clamp(Math.round(num(r.marks.brown)), 0, 3);
   r.scarring = r.scarring || {}; r.scarring.level = clamp(Math.round(num(r.scarring.level)), 0, 3); r.scarring.types = Array.isArray(r.scarring.types) ? r.scarring.types : [];
-  for (const k of ["strengths", "concerns", "likelyTriggers"]) if (!Array.isArray(r[k])) r[k] = [];
+  for (const k of ["strengths", "concerns", "likelyTriggers", "productAdvice", "memory"]) if (!Array.isArray(r[k])) r[k] = [];
   r.routine = r.routine || {}; for (const k of ["am", "pm", "avoid"]) if (!Array.isArray(r.routine[k])) r.routine[k] = [];
   r.photoQuality = r.photoQuality || { score: 70, issues: [] }; if (!Array.isArray(r.photoQuality.issues)) r.photoQuality.issues = [];
   return r;
@@ -692,7 +722,7 @@ async function saveScan(report) {
     await store.set(id, body);
     shots.front = shots.left = shots.right = null; renderShots();
     toast(report ? "Report saved to your journal" : "Photo saved");
-    if (report) openReport(id, body);
+    if (report) { openReport(id, body); for (const m of report.memory.slice(0, 3)) remember(m, "scan", true); }
   } catch (e) {
     // too large? drop side photos and retry once
     try { body.sides = { left: null, right: null }; await store.set(id, body); shots.front = shots.left = shots.right = null; renderShots(); if (report) openReport(id, body); }
@@ -771,6 +801,8 @@ function reportHTML(scan) {
   ${r.routine.am.length || r.routine.pm.length ? `<div class="card"><h3>Suggested routine</h3><div class="routine-out">
     ${["am", "pm"].map((t) => `<div class="stack" style="gap:6px"><span class="label">${t === "am" ? "Morning" : "Evening"}</span><ol>${r.routine[t].map((s) => `<li><b>${esc(s.step)}</b>: ${esc(s.ingredient)}<br><span class="tiny muted">${esc(s.why)}</span></li>`).join("")}</ol></div>`).join("")}
     </div>${r.routine.avoid.length ? `<div class="stack" style="gap:4px"><span class="label">Avoid</span><ul class="plain small">${r.routine.avoid.map((s) => `<li>${esc(s)}</li>`).join("")}</ul></div>` : ""}</div>` : ""}
+  ${r.productAdvice && r.productAdvice.length ? `<div class="card"><h3>Your products</h3>${r.productAdvice.map((a) => `<div class="concern"><b class="small">${esc(a.product)}</b><span class="small">${esc(a.advice)}</span></div>`).join("")}</div>` : ""}
+  ${r.memory && r.memory.length ? `<p class="tiny muted">Remembered for next time: ${esc(r.memory.join(" · "))}</p>` : ""}
   ${r.changes ? `<p class="small muted">${esc(r.changes)}</p>` : ""}`;
 }
 const cap = (s) => String(s).charAt(0).toUpperCase() + String(s).slice(1);
@@ -835,14 +867,16 @@ $("ciRoutine").addEventListener("change", (e) => {
   cb.checked ? cur.add(cb.dataset.id) : cur.delete(cb.dataset.id);
   patchDay({ [t + "Done"]: [...cur] });
 });
+const weekdayOf = (key) => new Date(key + "T12:00").getDay();
+const stepsFor = (t, wd) => routineFull(t).filter((s) => !s.days || !s.days.length || wd === undefined || s.days.includes(wd));
 function renderCheckin() {
-  const r = routine(), d = today();
+  const r = routine(), d = today(), wd = new Date().getDay();
   const box = $("ciRoutine");
   const anyFocus = box.contains(document.activeElement) ? document.activeElement.id : null;
   if (!r.am.length && !r.pm.length) {
-    box.innerHTML = `<span class="label">Routine</span>${["am", "pm"].map((t) => `<label class="checkrow" for="ci-${t}-basic"><input type="checkbox" id="ci-${t}-basic" data-t="${t}" data-id="basic" ${(d[t + "Done"] || []).includes("basic") ? "checked" : ""}><span>${t === "am" ? "Morning routine done" : "Evening routine done"}</span></label>`).join("")}<p class="tiny muted">Add your products in <a href="#routine">Routine</a> to tick off each step.</p>`;
+    box.innerHTML = `<span class="label">Routine</span>${["am", "pm"].map((t) => `<label class="checkrow" for="ci-${t}-basic"><input type="checkbox" id="ci-${t}-basic" data-t="${t}" data-id="basic" ${(d[t + "Done"] || []).includes("basic") ? "checked" : ""}><span>${t === "am" ? "Morning routine done" : "Evening routine done"}</span></label>`).join("")}<p class="tiny muted">Add your products and routine in <a href="#routine">My skin</a> to tick off each step.</p>`;
   } else {
-    box.innerHTML = ["am", "pm"].filter((t) => r[t].length).map((t) => `<span class="label">${t === "am" ? "Morning" : "Evening"}</span>` + r[t].map((s) => `<label class="checkrow" for="ci-${t}-${esc(s.id)}"><input type="checkbox" id="ci-${t}-${esc(s.id)}" data-t="${t}" data-id="${esc(s.id)}" ${(d[t + "Done"] || []).includes(s.id) ? "checked" : ""}><span>${esc(s.name)} <span class="tiny muted">${esc(s.kind)}</span></span></label>`).join("")).join("");
+    box.innerHTML = ["am", "pm"].map((t) => [t, stepsFor(t, wd)]).filter(([, l]) => l.length).map(([t, l]) => `<span class="label">${t === "am" ? "Morning" : "Evening"}</span>` + l.map((s) => `<label class="checkrow" for="ci-${t}-${esc(s.id)}"><input type="checkbox" id="ci-${t}-${esc(s.id)}" data-t="${t}" data-id="${esc(s.id)}" ${(d[t + "Done"] || []).includes(s.id) ? "checked" : ""}><span>${esc(s.name)} <span class="tiny muted">${esc(s.kind)}${s.days && s.days.length ? " · " + esc(daysLabel(s.days)) : ""}</span></span></label>`).join("")).join("");
   }
   if (anyFocus && $(anyFocus)) $(anyFocus).focus();
   for (const f of renderers) f();
@@ -850,64 +884,259 @@ function renderCheckin() {
 }
 function adherence(d) {
   const r = routine();
-  const total = r.am.length + r.pm.length;
-  if (!total) { const n = (d.amDone || []).includes("basic") + (d.pmDone || []).includes("basic"); return d.amDone || d.pmDone ? n / 2 : null; }
-  const ids = new Set([...r.am, ...r.pm].map((s) => s.id));
+  if (!r.am.length && !r.pm.length) { const n = (d.amDone || []).includes("basic") + (d.pmDone || []).includes("basic"); return d.amDone || d.pmDone ? n / 2 : null; }
+  const wd = d.id ? weekdayOf(d.id.slice(4)) : new Date().getDay();
+  const due = [...stepsFor("am", wd), ...stepsFor("pm", wd)];
+  if (!due.length) return null;
+  const ids = new Set(due.map((s) => s.id));
   const done = [...(d.amDone || []), ...(d.pmDone || [])].filter((x) => ids.has(x)).length;
-  return d.amDone || d.pmDone ? done / total : null;
+  return d.amDone || d.pmDone ? done / due.length : null;
 }
 
+/* ---------- products ---------- */
+const STATUS = [["using", "Using"], ["paused", "Paused"], ["stopped", "Stopped"], ["want", "Want to try"]];
+const VERDICT = [["unsure", "Too early to tell"], ["helps", "Helps"], ["neutral", "No difference"], ["breakout", "Broke me out"], ["irritates", "Irritates"]];
+const PAO = [0, 3, 6, 9, 12, 18, 24, 36];
+const WD = ["S", "M", "T", "W", "T", "F", "S"], WDN = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const daysLabel = (ds) => !ds || !ds.length || ds.length === 7 ? "Every day" : ds.slice().sort().map((d) => WDN[d]).join(", ");
+const products = () => (docs.products && Array.isArray(docs.products.items) ? docs.products.items : []);
+const productById = (id) => products().find((p) => p.id === id);
+function routineFull(t) {
+  return routine()[t].map((s) => { const p = s.productId ? productById(s.productId) : null; return p ? { ...s, name: p.name, kind: p.kind, active: p.active, started: p.started, product: p } : s; }).filter((s) => s.name);
+}
+async function saveProducts(items) {
+  const body = { type: "products", items };
+  docs.products = body; renderAll();
+  try { await store.set("products", body); } catch { toast("Couldn't save your products. Try again."); }
+}
+let prodFilter = "using", prodEdit = null, prodConfirm = null;
+$("prodFilter").addEventListener("click", (e) => { const b = e.target.closest("button"); if (!b) return; prodFilter = b.dataset.f; for (const x of $("prodFilter").children) x.setAttribute("aria-pressed", String(x === b)); renderProducts(); });
+$("prodManual").addEventListener("click", () => { prodEdit = { id: null, status: "using", verdict: "unsure", kind: "Cleanser", active: "none", started: todayKey() }; renderProductForm(); });
+function effectOf(p) {
+  if (!p.started) return null;
+  const rep = scans().filter((s) => s.report).reverse(), start = new Date(p.started + "T00:00").getTime();
+  const before = rep.filter((s) => new Date(s.at).getTime() <= start + 3 * 864e5).pop();
+  const after = rep.filter((s) => new Date(s.at).getTime() >= start + 14 * 864e5).pop();
+  if (!before || !after || before === after) return null;
+  return { from: before.report.skinScore, to: after.report.skinScore, d: after.report.skinScore - before.report.skinScore, inf: inflamed(after.report) - inflamed(before.report) };
+}
+function addMonths(dateStr, m) { const d = new Date(dateStr + "T00:00"); d.setMonth(d.getMonth() + m); return d; }
+function renderProducts() {
+  const all = products(), list = prodFilter === "all" ? all : all.filter((p) => p.status === "using" || !p.status);
+  $("prodCount").textContent = all.length ? all.filter((p) => p.status === "using").length + " in use" : "";
+  if (!all.length) { $("prodList").innerHTML = `<p class="small muted">No products yet. Start with what you used this week: cleanser, moisturizer, sunscreen, any treatment, and your shaving gel or aftershave.</p>`; return; }
+  if (!list.length) { $("prodList").innerHTML = `<p class="small muted">Nothing marked as in use. Tap All to see the rest.</p>`; return; }
+  const inRoutine = (id) => ["am", "pm"].filter((t) => routine()[t].some((s) => s.productId === id)).map((t) => (t === "am" ? "AM" : "PM"));
+  $("prodList").innerHTML = list.map((p) => {
+    const days = p.started ? Math.max(0, Math.floor((Date.now() - new Date(p.started + "T00:00").getTime()) / 864e5)) : null;
+    const exp = p.opened && p.pao ? addMonths(p.opened, p.pao) : null, expired = exp && exp < new Date();
+    const eff = effectOf(p), v = VERDICT.find((x) => x[0] === p.verdict) || VERDICT[0];
+    const vClass = p.verdict === "helps" ? "good" : p.verdict === "breakout" || p.verdict === "irritates" ? "bad" : "";
+    const r = inRoutine(p.id);
+    return `<div class="prod">
+      <div class="row between" style="align-items:flex-start;flex-wrap:nowrap"><div class="stack" style="gap:2px"><b>${esc(p.name)}</b><span class="tiny muted">${esc([p.brand, p.kind].filter(Boolean).join(" · "))}</span></div>
+        <div class="row" style="gap:6px;justify-content:flex-end"><span class="pill ${p.status === "using" ? "good" : ""}">${esc((STATUS.find((s) => s[0] === p.status) || STATUS[0])[1])}</span></div></div>
+      <div class="row" style="gap:6px">${p.active && p.active !== "none" ? `<span class="pill">${esc(ACT_NAME[p.active] || "")}</span>` : ""}<span class="pill ${vClass}">${esc(v[1])}</span>${r.length ? `<span class="pill">In routine · ${r.join(" + ")}</span>` : ""}</div>
+      ${p.whatFor ? `<p class="small">${esc(p.whatFor)}</p>` : ""}
+      ${p.flags && p.flags.length ? `<p class="notice warn small"><b>Watch:</b> ${esc(p.flags.join("; "))}</p>` : ""}
+      ${p.howTo ? `<p class="tiny muted"><b>How to use:</b> ${esc(p.howTo)}</p>` : ""}
+      ${p.keyIngredients && p.keyIngredients.length ? `<p class="tiny muted"><b>Key ingredients:</b> ${esc(p.keyIngredients.join(", "))}</p>` : ""}
+      <p class="tiny muted">${[days !== null ? (p.status === "using" ? "In use " : "Started ") + (days < 1 ? "today" : days + " day" + (days === 1 ? "" : "s") + (p.status === "using" ? "" : " ago")) : "", exp ? (expired ? "" : "Use by " + exp.toLocaleDateString(undefined, { month: "short", year: "numeric" })) : ""].filter(Boolean).map(esc).join(" · ")}${expired ? ` <span class="pill bad">Past its use-by date</span>` : ""}</p>
+      ${eff ? `<p class="small"><b>Your skin since starting:</b> score ${eff.from} → ${eff.to} <span class="pill ${eff.d >= 3 ? "good" : eff.d <= -3 ? "bad" : ""}">${eff.d > 0 ? "+" : ""}${eff.d}</span>, ${eff.inf <= 0 ? Math.abs(eff.inf) + " fewer" : eff.inf + " more"} inflamed spots</p>` : p.started && p.status === "using" ? `<p class="tiny muted">Its effect shows here once you have a scan from before you started and one 2+ weeks after.</p>` : ""}
+      ${p.notes ? `<p class="small muted">${esc(p.notes)}</p>` : ""}
+      <div class="row" style="gap:6px">${prodConfirm === p.id ? `<button class="sm danger" type="button" data-pdel="${esc(p.id)}">Delete product</button><button class="sm" type="button" data-pkeep="1">Keep</button>` : `<button class="sm" type="button" data-pedit="${esc(p.id)}">Edit</button>${r.length ? "" : `<button class="sm" type="button" data-proute="${esc(p.id)}:am">+ AM</button><button class="sm" type="button" data-proute="${esc(p.id)}:pm">+ PM</button>`}<button class="sm ghost" type="button" data-pask="${esc(p.id)}">Delete</button>`}</div>
+    </div>`;
+  }).join("");
+}
+$("prodList").addEventListener("click", async (e) => {
+  const b = e.target.closest("button"); if (!b) return;
+  if (b.dataset.pedit) { prodEdit = { ...productById(b.dataset.pedit) }; renderProductForm(); $("prodFormBox").scrollIntoView({ block: "center" }); }
+  else if (b.dataset.pask) { prodConfirm = b.dataset.pask; renderProducts(); }
+  else if (b.dataset.pkeep) { prodConfirm = null; renderProducts(); }
+  else if (b.dataset.pdel) {
+    const id = b.dataset.pdel; prodConfirm = null;
+    const r2 = structuredClone(routine()); let changed = false;
+    for (const t of ["am", "pm"]) { const n = r2[t].length; r2[t] = r2[t].filter((s) => s.productId !== id); changed ||= r2[t].length !== n; }
+    await saveProducts(products().filter((p) => p.id !== id));
+    if (changed) await saveRoutine(r2);
+  } else if (b.dataset.proute) {
+    const [id, t] = b.dataset.proute.split(":");
+    const r2 = structuredClone(routine()); r2[t].push({ id: "s" + Date.now().toString(36), productId: id, days: [] });
+    await saveRoutine(r2); toast("Added to your " + (t === "am" ? "morning" : "evening") + " routine");
+  }
+});
+function renderProductForm() {
+  const box = $("prodFormBox"), p = prodEdit;
+  if (!p) { box.innerHTML = ""; return; }
+  box.innerHTML = `<form class="addform" id="pf">
+    <h3>${p.id ? "Edit product" : "New product"}</h3>
+    <label class="field" for="pf-name"><span class="label">Name</span><input id="pf-name" type="text" required maxlength="100" value="${esc(p.name || "")}" placeholder="e.g. Acne foaming wash 4%"></label>
+    <div class="twocol">
+      <label class="field" for="pf-brand"><span class="label">Brand</span><input id="pf-brand" type="text" maxlength="60" value="${esc(p.brand || "")}"></label>
+      <label class="field" for="pf-kind"><span class="label">Type</span><select id="pf-kind">${KINDS.map((k) => `<option ${k === p.kind ? "selected" : ""}>${k}</option>`).join("")}</select></label>
+      <label class="field" for="pf-active"><span class="label">Main active</span><select id="pf-active">${ACTIVES.map(([k, l]) => `<option value="${k}" ${k === p.active ? "selected" : ""}>${l}</option>`).join("")}</select></label>
+      <label class="field" for="pf-status"><span class="label">Status</span><select id="pf-status">${STATUS.map(([k, l]) => `<option value="${k}" ${k === p.status ? "selected" : ""}>${l}</option>`).join("")}</select></label>
+      <label class="field" for="pf-started"><span class="label">Started using</span><input id="pf-started" type="date" value="${esc(p.started || "")}"></label>
+      <label class="field" for="pf-opened"><span class="label">Opened</span><input id="pf-opened" type="date" value="${esc(p.opened || "")}"></label>
+      <label class="field" for="pf-pao"><span class="label">Good for after opening</span><select id="pf-pao">${PAO.map((m) => `<option value="${m}" ${m === (p.pao || 0) ? "selected" : ""}>${m ? m + " months" : "Not sure"}</option>`).join("")}</select></label>
+      <label class="field" for="pf-verdict"><span class="label">Verdict</span><select id="pf-verdict">${VERDICT.map(([k, l]) => `<option value="${k}" ${k === p.verdict ? "selected" : ""}>${l}</option>`).join("")}</select></label>
+    </div>
+    <label class="field" for="pf-notes"><span class="label">Notes</span><textarea id="pf-notes" maxlength="400" placeholder="How it feels, how often you use it, price…">${esc(p.notes || "")}</textarea></label>
+    ${p.flags && p.flags.length ? `<p class="notice warn small"><b>Claude flagged:</b> ${esc(p.flags.join("; "))}</p>` : ""}
+    ${p.fitsYou ? `<p class="notice info small">${esc(p.fitsYou)}</p>` : ""}
+    <div class="row"><button class="primary grow" type="submit">Save product</button><button class="ghost" type="button" id="pf-cancel">Cancel</button></div>
+  </form>`;
+  $("pf-cancel").addEventListener("click", () => { prodEdit = null; renderProductForm(); });
+  $("pf").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const v = (id) => $(id).value.trim();
+    const item = { ...prodEdit, id: prodEdit.id || "p" + Date.now().toString(36), name: v("pf-name"), brand: v("pf-brand"), kind: v("pf-kind"), active: v("pf-active"), status: v("pf-status"), started: v("pf-started"), opened: v("pf-opened"), pao: Number(v("pf-pao")) || 0, verdict: v("pf-verdict"), notes: v("pf-notes") };
+    delete item.fitsYou;
+    if (!item.name) return;
+    const list = products().slice(), i = list.findIndex((x) => x.id === item.id);
+    if (i >= 0) list[i] = item; else list.unshift(item);
+    prodEdit = null; renderProductForm();
+    await saveProducts(list);
+    toast("Product saved");
+  });
+  setTimeout(() => $("pf-name")?.focus(), 0);
+}
+$("prodPhoto").addEventListener("change", async (e) => {
+  const f = e.target.files[0]; e.target.value = ""; if (!f) return;
+  const st = $("prodStatus");
+  const sm = await getSample();
+  if (!sm || !sm.maxImages) { st.innerHTML = `<p class="notice small">Reading labels needs Claude, which this view can't reach. Add the product by hand instead.</p>`; return; }
+  st.innerHTML = `<div class="progress-steps"><div class="on"><span class="dot"></span>Reading the label and ingredients</div></div>`;
+  try {
+    const { img, url } = await loadImage(f);
+    const c = document.createElement("canvas"), sc = Math.min(1, 1400 / Math.max(img.naturalWidth, img.naturalHeight));
+    c.width = Math.round(img.naturalWidth * sc); c.height = Math.round(img.naturalHeight * sc);
+    c.getContext("2d").drawImage(img, 0, 0, c.width, c.height); URL.revokeObjectURL(url);
+    const blob = await toBlob(c, 0.88);
+    const res = await sm.s.json(`The attached photo shows a skincare, shaving or cosmetic product that a person with acne-prone skin uses. Read the label (front and/or ingredient list) carefully.
+
+What we know about this person:
+${memoryText() || "Nothing yet."}
+Their current products: ${products().filter((p) => p.status === "using").map((p) => p.name + (p.active && p.active !== "none" ? " (" + ACT_NAME[p.active] + ")" : "")).join("; ") || "none listed"}
+
+Return ONLY a JSON object:
+{"isProduct": boolean,
+ "name": product name as printed (include strength, e.g. "4%"),
+ "brand": brand or "",
+ "kind": one of ${JSON.stringify(KINDS)},
+ "active": the main acne-relevant active, one of ${JSON.stringify(ACTIVES.map((a) => a[0]))},
+ "keyIngredients": up to 8 notable ingredients with strengths when printed,
+ "flags": 0-4 short warnings relevant to acne-prone skin (known pore-cloggers such as isopropyl myristate, coconut oil or algae extract; added fragrance; high drying alcohol; strong irritants), naming the ingredient; [] if none,
+ "whatFor": one sentence on what this product does for acne-prone skin,
+ "howTo": one specific sentence on how and when this person should use it,
+ "fitsYou": one sentence on whether it suits this person given what we know and their other products, including any clash,
+ "pao": months from the open-jar symbol if visible, else 0}
+If the ingredient list isn't visible, say so in flags and work from the product name.`, { images: blob, modelTier: "default" });
+    if (!res || !res.isProduct) { st.innerHTML = `<p class="notice small">Couldn't find a product label in that photo. Try a closer, sharper shot of the front or the ingredient list.</p>`; return; }
+    st.innerHTML = "";
+    prodEdit = { id: null, status: "using", verdict: "unsure", started: todayKey(), opened: todayKey(), name: String(res.name || "").slice(0, 100), brand: String(res.brand || "").slice(0, 60),
+      kind: KINDS.includes(res.kind) ? res.kind : "Other", active: ACT_NAME[res.active] ? res.active : "other",
+      keyIngredients: Array.isArray(res.keyIngredients) ? res.keyIngredients.slice(0, 8).map(String) : [], flags: Array.isArray(res.flags) ? res.flags.slice(0, 4).map(String) : [],
+      whatFor: String(res.whatFor || ""), howTo: String(res.howTo || ""), fitsYou: String(res.fitsYou || ""), pao: PAO.includes(Number(res.pao)) ? Number(res.pao) : 0 };
+    renderProductForm(); $("prodFormBox").scrollIntoView({ block: "start" });
+  } catch (err) {
+    st.innerHTML = `<p class="notice small">${esc(err && err.code === "rate_limited" ? "Usage limit reached. Try again later, or add it by hand." : "Couldn't read that label. Try again or add it by hand.")}</p>`;
+  }
+});
+
+/* ---------- memory ---------- */
+const memory = () => (docs.memory && Array.isArray(docs.memory.facts) ? docs.memory.facts : []);
+const memoryText = () => memory().map((f) => "- " + f.text).join("\n");
+let memWriting = Promise.resolve(), memEditId = null;
+function saveMemory(facts) {
+  const body = { type: "memory", facts: facts.slice(0, 60) };
+  docs.memory = body; renderMemory();
+  memWriting = memWriting.then(() => store.set("memory", body)).catch(() => toast("Couldn't save memory. Try again."));
+  return memWriting;
+}
+const normText = (s) => String(s).toLowerCase().replace(/[^a-z0-9 ]/g, "").trim();
+function remember(text, source, quiet) {
+  text = String(text || "").trim().slice(0, 240); if (!text) return;
+  const have = new Set(memory().map((f) => normText(f.text)));
+  if (have.has(normText(text))) return;
+  saveMemory([{ id: "m" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), text, source, at: todayKey() }, ...memory()]);
+  if (!quiet) toast("Remembered");
+}
+$("memAdd").addEventListener("click", () => { $("memForm").hidden = false; $("memText").value = ""; $("memText").focus(); });
+$("memCancel").addEventListener("click", () => { $("memForm").hidden = true; });
+$("memForm").addEventListener("submit", (e) => { e.preventDefault(); remember($("memText").value, "you"); $("memForm").hidden = true; });
+function renderMemory() {
+  const f = memory(), box = $("memList");
+  if (!f.length) { box.innerHTML = `<p class="small muted">Nothing yet. Your scans will add what they learn, like your skin type and where you break out. Add things only you know: allergies, what's worked before, medication, your shaving routine.</p>`; return; }
+  const src = { you: "You", scan: "From a scan", claude: "Clearday" };
+  box.innerHTML = f.map((m) => memEditId === m.id
+    ? `<form class="memrow" data-mform="${esc(m.id)}"><input type="text" id="me-${esc(m.id)}" value="${esc(m.text)}" maxlength="240" aria-label="Edit memory"><div class="row" style="gap:6px"><button class="sm primary" type="submit">Save</button><button class="sm ghost" type="button" data-mcancel="1">Cancel</button></div></form>`
+    : `<div class="memrow"><div class="stack" style="gap:2px"><span class="small">${esc(m.text)}</span><span class="tiny muted">${esc(src[m.source] || "Clearday")} · ${esc(fmtShort(m.at))}</span></div><div class="row" style="gap:4px;flex-wrap:nowrap"><button class="sm ghost" type="button" data-medit="${esc(m.id)}">Edit</button><button class="sm ghost" type="button" data-mdel="${esc(m.id)}" aria-label="Forget this">Forget</button></div></div>`).join("");
+}
+$("memList").addEventListener("click", (e) => {
+  const b = e.target.closest("button"); if (!b) return;
+  if (b.dataset.medit) { memEditId = b.dataset.medit; renderMemory(); setTimeout(() => $("me-" + memEditId)?.focus(), 0); }
+  else if (b.dataset.mcancel) { memEditId = null; renderMemory(); }
+  else if (b.dataset.mdel) { saveMemory(memory().filter((m) => m.id !== b.dataset.mdel)); toast("Forgotten"); }
+});
+$("memList").addEventListener("submit", (e) => {
+  e.preventDefault(); const id = e.target.dataset.mform, v = $("me-" + id).value.trim(); memEditId = null;
+  saveMemory(v ? memory().map((m) => (m.id === id ? { ...m, text: v.slice(0, 240), source: "you" } : m)) : memory().filter((m) => m.id !== id));
+});
+
 /* ---------- routine editor ---------- */
-let adding = null;
+let adding = null, addDays = [];
 document.addEventListener("click", (e) => {
-  const a = e.target.closest("[data-add]"); if (a) { adding = a.dataset.add; renderRoutine(); setTimeout(() => $("rf-name")?.focus(), 0); }
+  const a = e.target.closest("[data-add]"); if (a) { adding = a.dataset.add; addDays = []; renderRoutine(); setTimeout(() => $("rf-prod")?.focus(), 0); }
 });
 function renderRoutine() {
-  const r = routine();
+  const r = routine(), shelf = products().filter((p) => p.status !== "stopped");
   for (const t of ["am", "pm"]) {
-    const box = $("list-" + t);
-    let h = r[t].map((s, i) => `<div class="step"><div class="meta"><b>${esc(s.name)}</b><span class="tiny muted">${esc(s.kind)}${s.active && s.active !== "none" ? " · " + esc(ACT_NAME[s.active] || "") : ""}${s.started ? " · since " + esc(fmtShort(s.started)) : ""}</span></div>
+    const box = $("list-" + t), full = routineFull(t);
+    let h = full.map((s, i) => `<div class="step"><div class="meta"><b>${esc(s.name)}</b><span class="tiny muted">${esc(s.kind)}${s.active && s.active !== "none" ? " · " + esc(ACT_NAME[s.active] || "") : ""} · ${esc(daysLabel(s.days))}</span></div>
       <div class="row" style="gap:6px"><button class="sm ghost" data-mv="${t}:${i}:-1" aria-label="Move up" ${i === 0 ? "disabled" : ""}>↑</button><button class="sm ghost" data-del-step="${t}:${i}" aria-label="Remove ${esc(s.name)}">Remove</button></div></div>`).join("");
-    if (!r[t].length && adding !== t) h = `<p class="small muted">${t === "am" ? "Most good morning routines are: gentle cleanser, treatment or niacinamide, moisturizer, sunscreen SPF 30+." : "A solid evening routine: cleanser, one treatment (retinoid or benzoyl peroxide), moisturizer."}</p>`;
-    if (adding === t) h += `<form class="addform" id="rf"><label class="field" for="rf-name"><span class="label">Product</span><input id="rf-name" type="text" required maxlength="80" placeholder="e.g. Adapalene gel 0.1%"></label>
-      <div class="twocol"><label class="field" for="rf-kind"><span class="label">Step</span><select id="rf-kind">${KINDS.map((k) => `<option>${k}</option>`).join("")}</select></label>
-      <label class="field" for="rf-active"><span class="label">Active ingredient</span><select id="rf-active">${ACTIVES.map(([k, l]) => `<option value="${k}">${l}</option>`).join("")}</select></label></div>
-      <label class="field" for="rf-start"><span class="label">Started using it</span><input id="rf-start" type="date" value="${todayKey()}"></label>
-      <div class="row"><button class="primary grow" type="submit">Add to ${t === "am" ? "morning" : "evening"}</button><button type="button" id="rf-cancel" class="ghost">Cancel</button></div></form>`;
+    if (!full.length && adding !== t) h = `<p class="small muted">${t === "am" ? "A good morning routine: gentle cleanser, treatment or niacinamide, moisturizer, sunscreen SPF 30+." : "A solid evening routine: cleanser, one treatment (retinoid or benzoyl peroxide), moisturizer."}</p>`;
+    if (adding === t) h += shelf.length ? `<form class="addform" id="rf">
+      <label class="field" for="rf-prod"><span class="label">Product</span><select id="rf-prod">${shelf.map((p) => `<option value="${esc(p.id)}">${esc(p.name)}${p.brand ? " · " + esc(p.brand) : ""}</option>`).join("")}</select></label>
+      <div class="field"><span class="label">Days</span><div class="chips" id="rf-days">${WD.map((d, i) => `<button type="button" class="chip" data-wd="${i}" aria-pressed="${addDays.includes(i)}" aria-label="${WDN[i]}">${d}</button>`).join("")}</div><span class="tiny muted">Leave all off for every day. Pick days for things like exfoliants used twice a week.</span></div>
+      <div class="row"><button class="primary grow" type="submit">Add to ${t === "am" ? "morning" : "evening"}</button><button type="button" id="rf-cancel" class="ghost">Cancel</button></div></form>`
+      : `<div class="addform"><p class="small">Add the product to <b>My products</b> first, then build your routine from it.</p><div class="row"><button type="button" class="primary sm" id="rf-goprod">Add a product</button><button type="button" id="rf-cancel" class="ghost sm">Cancel</button></div></div>`;
     box.innerHTML = h;
   }
-  const f = $("rf");
-  if (f) {
-    f.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const r2 = structuredClone(routine());
-      r2[adding].push({ id: "p" + Date.now().toString(36), name: $("rf-name").value.trim(), kind: $("rf-kind").value, active: $("rf-active").value, started: $("rf-start").value || todayKey() });
-      adding = null; await saveRoutine(r2);
-    });
-    $("rf-cancel").addEventListener("click", () => { adding = null; renderRoutine(); });
-  }
+  $("rf-cancel")?.addEventListener("click", () => { adding = null; renderRoutine(); });
+  $("rf-goprod")?.addEventListener("click", () => { adding = null; renderRoutine(); $("prodManual").click(); $("prodFormBox").scrollIntoView({ block: "start" }); });
+  $("rf-days")?.addEventListener("click", (e) => { const b = e.target.closest("button"); if (!b) return; const d = Number(b.dataset.wd); addDays = addDays.includes(d) ? addDays.filter((x) => x !== d) : [...addDays, d]; b.setAttribute("aria-pressed", String(addDays.includes(d))); });
+  $("rf")?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const r2 = structuredClone(routine());
+    r2[adding].push({ id: "s" + Date.now().toString(36), productId: $("rf-prod").value, days: addDays.length === 7 ? [] : addDays.slice().sort() });
+    adding = null; await saveRoutine(r2);
+  });
   // warnings
-  const all = [...r.am.map((s) => ({ ...s, t: "am" })), ...r.pm.map((s) => ({ ...s, t: "pm" }))];
+  const all = [...routineFull("am").map((s) => ({ ...s, t: "am" })), ...routineFull("pm").map((s) => ({ ...s, t: "pm" }))];
   const has = (a, t) => all.some((s) => s.active === a && (!t || s.t === t));
   const w = [];
   if (all.length) {
-    if (!r.am.some((s) => s.kind === "Sunscreen")) w.push(["bad", "No sunscreen in the morning. Retinoids and acids make skin burn more easily, and UV darkens acne marks."]);
-    if ((has("tretinoin", "pm") || has("adapalene", "pm") || has("retinol", "pm")) && (has("aha", "pm") || has("sa", "pm"))) w.push(["warn", "A retinoid and an exfoliating acid on the same night often irritates. Alternate nights instead."]);
+    if (!all.some((s) => s.t === "am" && s.kind === "Sunscreen")) w.push(["bad", "No sunscreen in the morning. Retinoids and acids make skin burn more easily, and UV darkens acne marks."]);
+    if ((has("tretinoin", "pm") || has("adapalene", "pm") || has("retinol", "pm")) && (has("aha", "pm") || has("sa", "pm"))) w.push(["warn", "A retinoid and an exfoliating acid in the same evening often irritates. Put them on different days."]);
     if (has("tretinoin", "pm") && has("bp", "pm")) w.push(["warn", "Benzoyl peroxide can break down tretinoin when applied together. Use BP in the morning (adapalene doesn't have this problem)."]);
     if ((has("tretinoin") || has("adapalene") || has("retinol")) && !all.some((s) => s.kind === "Moisturizer")) w.push(["warn", "Add a moisturizer. Retinoids are much easier to stick with when skin isn't dry and peeling."]);
     if (has("clinda") && !has("bp")) w.push(["warn", "Topical antibiotics should be paired with benzoyl peroxide to prevent resistant bacteria."]);
-    const actives = new Set(all.filter((s) => s.active && !["none", "niacinamide"].includes(s.active)).map((s) => s.active));
-    if (actives.size >= 4) w.push(["warn", `${actives.size} different actives is a lot. Too many at once damages the skin barrier and causes redness.`]);
+    const acts = new Set(all.filter((s) => s.active && !["none", "niacinamide"].includes(s.active)).map((s) => s.active));
+    if (acts.size >= 4) w.push(["warn", `${acts.size} different actives is a lot. Too many at once damages the skin barrier and causes redness.`]);
+    for (const s of all) if (s.product && (s.product.verdict === "breakout" || s.product.verdict === "irritates")) w.push(["bad", `${s.name} is in your routine but you marked it as "${VERDICT.find((v) => v[0] === s.product.verdict)[1].toLowerCase()}". Consider pausing it.`]);
+    for (const s of all) if (s.product && s.product.opened && s.product.pao && addMonths(s.product.opened, s.product.pao) < new Date()) w.push(["warn", `${s.name} is past its use-by date. Actives like benzoyl peroxide and vitamin C lose strength over time.`]);
     if (!w.length) w.push(["info", "No clashes found. Give each treatment the full timeline before judging it."]);
   }
   $("routineWarn").innerHTML = w.map(([k, t]) => `<p class="notice ${k === "bad" ? "" : k} small">${esc(t)}</p>`).join("");
   // timelines
-  const tl = all.filter((s) => TIMELINE[s.active] && s.started);
+  const seen = new Set(), tl = all.filter((s) => TIMELINE[s.active] && s.started && !seen.has(s.name) && seen.add(s.name));
   $("timelineCard").hidden = !tl.length;
   $("timelines").innerHTML = tl.map((s) => {
     const [wks, note] = TIMELINE[s.active], weeks = Math.max(0, Math.floor((Date.now() - new Date(s.started + "T00:00").getTime()) / (7 * 864e5)));
     return `<div class="stack" style="gap:4px"><div class="row between"><b class="small">${esc(s.name)}</b><span class="small num">week ${weeks + 1} of ${wks}</span></div><div class="weeks"><i style="width:${Math.min(100, ((weeks + 1) / wks) * 100)}%"></i></div><span class="tiny muted">${weeks + 1 >= wks ? "You've given it the full course. Compare your scans from before you started." : esc(note)}</span></div>`;
   }).join("");
+  renderProducts(); renderMemory();
 }
 document.addEventListener("click", async (e) => {
   const d = e.target.closest("[data-del-step]"), m = e.target.closest("[data-mv]");
@@ -1021,6 +1250,7 @@ function renderInsights(rep, map) {
     ["Alcohol", (w) => anyTag(w, "food", "alcohol"), (v) => v],
     ["Picked / popped", (w) => anyTag(w, "habit", "picked"), (v) => v],
     ["Didn't wash after sweating", (w) => anyTag(w, "habit", "noshower"), (v) => v],
+    ["Shaved", (w) => anyTag(w, "habit", "shaved"), (v) => v],
     ["Period", (w) => anyTag(w, "habit", "period"), (v) => v],
     ["Routine under 80%", (w) => { const a = w.map(adherence).filter((x) => x !== null); return a.length ? a.reduce((x, y) => x + y, 0) / a.length : null; }, (v) => v < 0.8],
   ];
@@ -1044,11 +1274,13 @@ $("askPatterns").addEventListener("click", async () => {
   btn.disabled = true; btn.textContent = "Reading your data…"; out.textContent = "";
   const sc = scans().filter((s) => s.report).reverse().map((s) => `${s.day}: score ${s.report.skinScore}, IGA ${s.report.iga}, inflamed ${inflamed(s.report)}, clogged ${comedones(s.report)}, zones ${ZONES.map(([k]) => k + ":" + s.report.zones[k].level).join(" ")}`).join("\n");
   const ds = days().sort((a, b) => (a.id > b.id ? 1 : -1)).slice(-60).map((d) => `${d.id.slice(4)}: sleep ${d.sleep ?? "?"}, stress ${d.stress ?? "?"}, water ${d.water ?? "?"}, newspots ${d.newspots ?? "?"}, routine ${adherence(d) === null ? "?" : Math.round(adherence(d) * 100) + "%"}, tags ${[...(d.feel || []), ...(d.food || []), ...(d.habit || [])].join("/") || "-"}`).join("\n");
-  const r = routine();
   try {
     const res = await sm.s(`You are a careful skincare data analyst. Below is one person's acne journal. Find the 2-4 most meaningful patterns linking their habits, routine and cycle to their skin, remembering acne lags triggers by 1-3 days and treatments take 8-12 weeks. Be specific (cite dates and numbers), say how confident you are, and don't overclaim from little data. End with one concrete experiment to run for the next 2 weeks. Plain text, short paragraphs, no markdown headings, under 220 words.
 
-Routine: AM ${r.am.map((s) => s.name + (s.started ? " since " + s.started : "")).join(", ") || "not set"}; PM ${r.pm.map((s) => s.name + (s.started ? " since " + s.started : "")).join(", ") || "not set"}
+What we remember about them:
+${memoryText() || "nothing yet"}
+Products (name, status, started, verdict): ${products().map((p) => `${p.name} (${p.status}${p.started ? ", since " + p.started : ""}, ${p.verdict || "unsure"})`).join("; ") || "none listed"}
+Routine: AM ${routineFull("am").map((s) => s.name + " " + daysLabel(s.days)).join(", ") || "not set"}; PM ${routineFull("pm").map((s) => s.name + " " + daysLabel(s.days)).join(", ") || "not set"}
 SCANS:
 ${sc}
 CHECK-INS:
