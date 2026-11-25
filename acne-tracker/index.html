@@ -246,6 +246,7 @@ nav.tabs svg { width: 24px; height: 24px }
         <button class="ghost" id="clearShots" hidden>Clear</button>
       </div>
       <p class="small muted" id="scanHint">Add a front photo to start. The analysis takes about 30 seconds.</p>
+      <p class="tiny muted">Photos are only used for the analysis and are never saved. Your journal keeps the report.</p>
       <div class="progress-steps" id="steps" hidden></div>
       <div id="scanError" hidden></div>
     </div>
@@ -308,7 +309,7 @@ nav.tabs svg { width: 24px; height: 24px }
       <button id="askPatterns" hidden>Ask Claude to read my patterns</button>
       <div id="patternOut" class="aiText small"></div>
     </div>
-    <div class="card">
+    <div class="card" hidden>
       <h3>Before &amp; after</h3>
       <div class="twocol">
         <label class="field" for="cmpA"><span class="label">Before</span><select id="cmpA"></select></label>
@@ -664,8 +665,7 @@ $("analyzeBtn").addEventListener("click", async () => {
   const sm = await getSample();
   if (!sm || !sm.maxImages) {
     err.hidden = false;
-    err.innerHTML = `<p class="notice">Skin analysis needs Claude, and this view can't reach it. Open Clearday on claude.ai while signed in. Your photo is still here.</p><button class="sm" id="savePhotoOnly">Save photo without analysis</button>`;
-    $("savePhotoOnly").onclick = () => saveScan(null);
+    err.innerHTML = `<p class="notice">Skin analysis needs Claude, and this view can't reach it. Open Clearday on claude.ai while signed in, then tap Analyze again.</p>`;
     return;
   }
   busy = true; renderShots();
@@ -717,7 +717,7 @@ const comedones = (r) => LESIONS.filter((l) => l[2] === "c").reduce((n, [k]) => 
 async function saveScan(report) {
   const now = new Date();
   const id = "scan_" + now.getTime().toString(36);
-  const body = { type: "scan", at: now.toISOString(), day: dayKey(now), photo: shots.front.thumb, sides: { left: shots.left?.thumb || null, right: shots.right?.thumb || null }, report };
+  const body = { type: "scan", at: now.toISOString(), day: dayKey(now), report };
   try {
     await store.set(id, body);
     shots.front = shots.left = shots.right = null; renderShots();
@@ -725,8 +725,7 @@ async function saveScan(report) {
     if (report) { openReport(id, body); for (const m of report.memory.slice(0, 3)) remember(m, "scan", true); }
   } catch (e) {
     // too large? drop side photos and retry once
-    try { body.sides = { left: null, right: null }; await store.set(id, body); shots.front = shots.left = shots.right = null; renderShots(); if (report) openReport(id, body); }
-    catch (e2) { toast((e2 && e2.message) || "Couldn't save. Try again."); }
+    toast((e && e.message) || "Couldn't save. Tap Analyze to try again.");
   }
 }
 
@@ -809,9 +808,8 @@ const cap = (s) => String(s).charAt(0).toUpperCase() + String(s).slice(1);
 function openReport(id, body) {
   const scan = body ? { ...body, id } : scans().find((s) => s.id === id);
   if (!scan) return;
-  $("sheetTitle").textContent = scan.report ? "Skin report" : "Photo";
-  $("sheetBody").innerHTML = (scan.report ? reportHTML(scan) : "") +
-    `<div class="card"><span class="label">Photos</span><div class="shots">${[scan.photo, scan.sides?.left, scan.sides?.right].map((p) => p ? `<div class="shot filled"><img src="${esc(p)}" alt="Scan photo"></div>` : "").join("")}</div></div>`;
+  $("sheetTitle").textContent = "Skin report";
+  $("sheetBody").innerHTML = scan.report ? reportHTML(scan) : `<p class="small muted">This scan has no report.</p>`;
   $("sheet").hidden = false; $("sheet").scrollTop = 0; document.body.style.overflow = "hidden";
   $("sheetClose").focus();
 }
@@ -1291,8 +1289,8 @@ ${ds}`, { modelTier: "default", onText: ({ text }) => { out.innerHTML = text.spl
 });
 function updateCompare() {
   const list = scans(), A = list.find((s) => s.id === $("cmpA").value), B = list.find((s) => s.id === $("cmpB").value);
-  $("compare").hidden = !(A && B);
-  if (A && B) { $("cmpImgA").src = A.photo; $("cmpImgB").src = B.photo; }
+  $("compare").hidden = !(A && B && A.photo && B.photo);
+  if (A && B && A.photo && B.photo) { $("cmpImgA").src = A.photo; $("cmpImgB").src = B.photo; }
 }
 $("cmpA").addEventListener("change", updateCompare);
 $("cmpB").addEventListener("change", updateCompare);
@@ -1300,9 +1298,9 @@ $("cmpCut").addEventListener("input", (e) => $("compare").style.setProperty("--c
 let confirmId = null;
 function renderHistory(list) {
   $("histCount").textContent = list.length ? list.length + " total" : "";
-  $("histList").innerHTML = list.length ? list.map((s) => `<div class="hitem"><img src="${esc(s.photo)}" alt="" loading="lazy">
+  $("histList").innerHTML = list.length ? list.map((s) => `<div class="hitem">${s.report ? ring(s.report.skinScore, 56, "Skin score") : `<span></span>`}
     <div class="meta"><b class="small">${esc(new Date(s.at).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" }))}</b>
-      ${s.report ? `<div class="row" style="gap:6px"><span class="pill" style="color:${scoreCol(s.report.skinScore)}">${s.report.skinScore}/100</span><span class="tiny muted">${active(s.report)} spots · ${GRADES[s.report.iga]}</span></div>` : `<span class="tiny muted">Photo only</span>`}</div>
+      ${s.report ? `<div class="row" style="gap:6px"><span class="pill" style="color:${scoreCol(s.report.skinScore)}">${s.report.skinScore}/100</span><span class="tiny muted">${active(s.report)} spots · ${GRADES[s.report.iga]}</span></div>` : `<span class="tiny muted">No report</span>`}</div>
     <div class="acts">${confirmId === s.id ? `<button class="sm danger" data-del="${esc(s.id)}">Delete</button><button class="sm" data-cancel="1">Keep</button>` : `<button class="sm" data-open="${esc(s.id)}">View</button><button class="sm ghost" data-ask="${esc(s.id)}">Delete</button>`}</div></div>`).join("")
     : `<p class="small muted">Scans you save appear here with their score. Tap View to reopen the full report.</p>`;
 }
